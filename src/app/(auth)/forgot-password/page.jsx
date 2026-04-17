@@ -1,55 +1,41 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Checkbox, Label } from "flowbite-react";
+import { Button } from "flowbite-react";
 import Input from "@/components/ui/form/Input";
 import Link from "next/link";
-import { UserPlus, Mail, Key } from "lucide-react";
+import { Mail, Key, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
 import { useLoading } from "@/context/LoadingContext";
-import { registerDetailsSchema, otpSchema, setPasswordSchema } from "@/utilities/validations";
+import { forgotPasswordEmailSchema, otpSchema, setPasswordSchema } from "@/utilities/validations";
 
-export default function RegisterPage() {
+export default function ForgotPasswordPage() {
   const router = useRouter();
   const toast = useToast();
   const { loading, setLoading } = useLoading();
   const [step, setStep] = useState(1);
 
-  // Step 1 data
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [companyName, setCompanyName] = useState("");
-
-  // Step 2 data
   const [otp, setOtp] = useState("");
-
-  // Step 3 data
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const handleRegister = async (e) => {
+  const handleSendOtp = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // The validation schema might not have company_name yet, but we will pass it anyway
-      await registerDetailsSchema.validate({ firstName, lastName, email }, { abortEarly: false });
+      await forgotPasswordEmailSchema.validate({ email }, { abortEarly: false });
 
-      const response = await apiClient.post("/auth/register/", {
-        first_name: firstName,
-        last_name: lastName,
-        email,
-        company_name: companyName,
-      });
+      const response = await apiClient.post("/api/forgot-password/", { email });
 
       if (response.data.success) {
-        toast.success(response.data.message || "OTP sent successfully.");
+        toast.success(response.data.message || "OTP sent to your email.");
         setStep(2);
       } else {
-        toast.error(response.data.message || "Registration failed.");
+        toast.error(response.data.message || "Failed to send OTP.");
       }
     } catch (err) {
       if (err.name === "ValidationError") {
@@ -59,10 +45,8 @@ export default function RegisterPage() {
       } else {
         if (err.response?.data?.email) {
           toast.error(err.response.data.email[0]);
-        } else if (err.response?.data?.non_field_errors) {
-          toast.error(err.response.data.non_field_errors[0]);
         } else {
-          toast.error(err.response?.data?.message || err.response?.data?.error || "Registration failed.");
+          toast.error(err.response?.data?.message || err.response?.data?.error || "No account found with this email.");
         }
       }
     } finally {
@@ -77,13 +61,13 @@ export default function RegisterPage() {
     try {
       await otpSchema.validate({ otp }, { abortEarly: false });
 
-      const response = await apiClient.post("/api/verify-otp/register/", {
+      const response = await apiClient.post("/api/verify-otp/forgot-password/", {
         email,
         otp,
       });
 
       if (response.data.success) {
-        toast.success("Email verified successfully. Please set your password.");
+        toast.success("OTP verified successfully. You can now reset your password.");
         setStep(3);
       } else {
         toast.error("Invalid or expired OTP.");
@@ -101,25 +85,25 @@ export default function RegisterPage() {
     }
   };
 
-  const handleSetPassword = async (e) => {
+  const handleResetPassword = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       await setPasswordSchema.validate({ password, confirmPassword }, { abortEarly: false });
 
-      const response = await apiClient.post("/api/set-password/", {
+      const response = await apiClient.post("/api/reset-password/", {
         email,
         password,
       });
 
       if (response.data.success) {
-        toast.success("Account created and password set successfully. Redirecting to login...");
+        toast.success("Password reset successfully. Redirecting to login...");
         setTimeout(() => {
           router.push("/login");
         }, 2000);
       } else {
-        toast.error(response.data.message || "Failed to set password.");
+        toast.error(response.data.message || "Password reset failed.");
       }
     } catch (err) {
       if (err.name === "ValidationError") {
@@ -127,7 +111,7 @@ export default function RegisterPage() {
           toast.error(validationError.message);
         });
       } else {
-        toast.error(err.response?.data?.message || err.response?.data?.error || "Failed to set password.");
+        toast.error(err.response?.data?.message || err.response?.data?.error || "Password reset failed.");
       }
     } finally {
       setLoading(false);
@@ -138,48 +122,19 @@ export default function RegisterPage() {
     <div className="w-full">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-2">
-          {step === 1 && "Create an account"}
-          {step === 2 && "Verify Email"}
-          {step === 3 && "Set Password"}
+          {step === 1 && "Forgot Password?"}
+          {step === 2 && "Verify OTP"}
+          {step === 3 && "Reset Password"}
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-          {step === 1 && "Join HISAAB to manage your finances effortlessly."}
+          {step === 1 && "Enter your email to receive a password reset OTP."}
           {step === 2 && `An OTP has been sent to ${email}`}
-          {step === 3 && "Secure your account with a strong password."}
+          {step === 3 && "Please enter your new password below."}
         </p>
       </div>
 
       {step === 1 && (
-        <form className="space-y-5" onSubmit={handleRegister}>
-          <div className="grid grid-cols-2 gap-4">
-            <Input 
-              id="firstName"
-              label="First Name"
-              type="text"
-              placeholder="John"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              required
-            />
-            <Input 
-              id="lastName"
-              label="Last Name"
-              type="text"
-              placeholder="Doe"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              required
-            />
-          </div>
-          <Input 
-            id="companyName"
-            label="Organization/Company Name"
-            type="text"
-            placeholder="Acme Corp"
-            value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
-            required
-          />
+        <form className="space-y-5" onSubmit={handleSendOtp}>
           <Input 
             id="email"
             label="Email"
@@ -190,24 +145,17 @@ export default function RegisterPage() {
             required
           />
           
-          <div className="flex items-start gap-2 pt-2">
-            <Checkbox id="terms" className="text-blue-600 focus:ring-blue-500 rounded mt-0.5" required />
-            <Label htmlFor="terms" className="text-sm text-gray-600 dark:text-gray-400 font-medium leading-tight cursor-pointer">
-              I accept the <Link href="#" className="font-bold text-blue-600 hover:text-blue-800 dark:text-blue-500 hover:underline transition-colors">Terms and Conditions</Link>
-            </Label>
-          </div>
-          
           <Button 
             type="submit" 
             disabled={loading}
             className="w-full bg-blue-600! hover:bg-blue-700! focus:ring-4! focus:ring-blue-300! dark:bg-blue-600! dark:hover:bg-blue-700! dark:focus:ring-blue-800! transition-all duration-200 mt-4 py-1 shadow-md hover:shadow-lg rounded-xl font-semibold disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <UserPlus className={`mr-2 h-5 w-5 ${loading ? "animate-spin" : ""}`} />
-            {loading ? "Sending OTP..." : "Continue"}
+            <Mail className={`mr-2 h-5 w-5 ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Sending OTP..." : "Send OTP"}
           </Button>
-          
+
           <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6 font-medium">
-            Already have an account?{" "}
+            Remember your password?{" "}
             <Link href="/login" className="font-bold text-blue-600 hover:text-blue-800 dark:text-blue-500 dark:hover:text-blue-400 transition-colors">
               Sign in
             </Link>
@@ -234,27 +182,27 @@ export default function RegisterPage() {
             disabled={loading || otp.length < 6}
             className="w-full bg-blue-600! hover:bg-blue-700! focus:ring-4! focus:ring-blue-300! dark:bg-blue-600! dark:hover:bg-blue-700! dark:focus:ring-blue-800! transition-all duration-200 mt-4 py-1 shadow-md hover:shadow-lg rounded-xl font-semibold disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <Mail className={`mr-2 h-5 w-5 ${loading ? "animate-spin" : ""}`} />
-            {loading ? "Verifying..." : "Verify Email"}
+            <ShieldCheck className={`mr-2 h-5 w-5 ${loading ? "animate-spin" : ""}`} />
+            {loading ? "Verifying..." : "Verify OTP"}
           </Button>
-          
+
           <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6 font-medium">
             <button 
               type="button" 
               onClick={() => setStep(1)} 
               className="font-bold text-blue-600 hover:text-blue-800 dark:text-blue-500 dark:hover:text-blue-400 transition-colors"
             >
-              Back to registration
+              Back to email
             </button>
           </p>
         </form>
       )}
 
       {step === 3 && (
-        <form className="space-y-5" onSubmit={handleSetPassword}>
+        <form className="space-y-5" onSubmit={handleResetPassword}>
           <Input 
             id="password"
-            label="Password"
+            label="New Password"
             type="password"
             placeholder="••••••••"
             value={password}
@@ -263,7 +211,7 @@ export default function RegisterPage() {
           />
           <Input 
             id="confirm-password"
-            label="Confirm Password"
+            label="Confirm New Password"
             type="password"
             placeholder="••••••••"
             value={confirmPassword}
@@ -277,7 +225,7 @@ export default function RegisterPage() {
             className="w-full bg-blue-600! hover:bg-blue-700! focus:ring-4! focus:ring-blue-300! dark:bg-blue-600! dark:hover:bg-blue-700! dark:focus:ring-blue-800! transition-all duration-200 mt-4 py-1 shadow-md hover:shadow-lg rounded-xl font-semibold disabled:opacity-70 disabled:cursor-not-allowed"
           >
             <Key className={`mr-2 h-5 w-5 ${loading ? "animate-spin" : ""}`} />
-            {loading ? "Saving..." : "Set Password"}
+            {loading ? "Resetting..." : "Reset Password"}
           </Button>
         </form>
       )}
