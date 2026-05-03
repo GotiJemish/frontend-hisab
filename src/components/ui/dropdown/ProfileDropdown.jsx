@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
 
 /**
  * ProfileDropdown
@@ -31,6 +32,7 @@ export default function ProfileDropdown({
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const { theme, toggleTheme } = useTheme();
+  const { logout } = useAuth();
   const params = useParams();
   const userId = params?.userId || "";
 
@@ -216,7 +218,10 @@ export default function ProfileDropdown({
               type="button"
               role="menuitem"
               className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#EF4444] hover:bg-[#FEF2F2] dark:text-[#F87171] dark:hover:bg-[#450A0A]/30 transition-colors"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false);
+                logout();
+              }}
             >
               <LogOut className="h-4 w-4" aria-hidden="true" />
               Sign Out

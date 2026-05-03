@@ -29,11 +29,17 @@ export default function ForgotPasswordPage() {
     try {
       await forgotPasswordEmailSchema.validate({ email }, { abortEarly: false });
 
-      const response = await apiClient.post("/api/forgot-password/", { email });
+      const response = await apiClient.post("auth/forgot-password/", { email });
 
       if (response.data.success) {
         toast.success(response.data.message || "OTP sent to your email.");
-        setStep(2);
+        if (response.data.message && response.data.message.toLowerCase().includes("new password")) {
+          setTimeout(() => {
+            router.push("/login");
+          }, 2000);
+        } else {
+          setStep(2);
+        }
       } else {
         toast.error(response.data.message || "Failed to send OTP.");
       }
@@ -61,7 +67,7 @@ export default function ForgotPasswordPage() {
     try {
       await otpSchema.validate({ otp }, { abortEarly: false });
 
-      const response = await apiClient.post("/api/verify-otp/forgot-password/", {
+      const response = await apiClient.post("auth/verify-otp/forgot-password/", {
         email,
         otp,
       });
@@ -92,7 +98,7 @@ export default function ForgotPasswordPage() {
     try {
       await setPasswordSchema.validate({ password, confirmPassword }, { abortEarly: false });
 
-      const response = await apiClient.post("/api/reset-password/", {
+      const response = await apiClient.post("auth/reset-password/", {
         email,
         password,
       });

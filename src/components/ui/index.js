@@ -21,6 +21,7 @@ export { default as TableRow } from './table/Row';
 // Standalone
 export { default as Alert } from './Alert';
 export { default as Modal } from './Modal';
+export { PermissionMatrix } from './PermissionMatrix';
 
 // Modal HOC + hook
 export { withModal, useModal } from '@/hoc/withModal';

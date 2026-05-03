@@ -11,19 +11,25 @@ import {
   Settings,
   HelpCircle,
   LogOut,
+  Shield,
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
   const pathname = usePathname();
   const params = useParams();
+  const { logout, user } = useAuth();
   const userId = params?.userId || "";
+  
+  const isAdmin = user?.role === "COMPANY_ADMIN" || user?.role === "SUPER_ADMIN";
 
   const NAV_ITEMS = [
-    { href: `/${userId}`,          label: "Dashboard",  icon: LayoutDashboard },
-    { href: `/${userId}/users`,    label: "Users",      icon: Users },
-    { href: `/${userId}/items`,    label: "Products",   icon: ShoppingBag },
-    { href: `/${userId}/orders`,   label: "Orders",     icon: Inbox },
-    { href: `/${userId}/reports`,  label: "Reports",    icon: FileText },
+    { href: `/${userId}`,          label: "Dashboard",  icon: LayoutDashboard, show: true },
+    { href: `/${userId}/users`,           label: "Users",           icon: Users, show: isAdmin },
+    { href: `/${userId}/configurations`,  label: "Configurations",  icon: Settings, show: isAdmin },
+    { href: `/${userId}/items`,           label: "Products",        icon: ShoppingBag, show: true },
+    { href: `/${userId}/orders`,   label: "Orders",     icon: Inbox, show: true },
+    { href: `/${userId}/reports`,  label: "Reports",    icon: FileText, show: true },
   ];
 
   const BOTTOM_ITEMS = [
@@ -50,7 +56,7 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
             Main Menu
           </p>
         )}
-        {NAV_ITEMS.map((item) => (
+        {NAV_ITEMS.filter(i => i.show).map((item) => (
           <NavItem
             key={item.href}
             {...item}
@@ -74,6 +80,7 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
         {/* Sign out */}
         <button
           type="button"
+          onClick={logout}
           className={`
             group relative w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium
             text-[#EF4444] hover:bg-[#FEF2F2] dark:text-[#F87171] dark:hover:bg-[#450A0A]/30

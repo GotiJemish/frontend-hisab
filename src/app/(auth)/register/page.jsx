@@ -77,7 +77,7 @@ export default function RegisterPage() {
     try {
       await otpSchema.validate({ otp }, { abortEarly: false });
 
-      const response = await apiClient.post("/api/verify-otp/register/", {
+      const response = await apiClient.post("auth/verify-otp/register/", {
         email,
         otp,
       });
@@ -108,7 +108,7 @@ export default function RegisterPage() {
     try {
       await setPasswordSchema.validate({ password, confirmPassword }, { abortEarly: false });
 
-      const response = await apiClient.post("/api/set-password/", {
+      const response = await apiClient.post("auth/set-password/", {
         email,
         password,
       });
