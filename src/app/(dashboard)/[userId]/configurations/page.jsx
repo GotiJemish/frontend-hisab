@@ -15,6 +15,7 @@ import {
 import { Btn, Card, InputField, Table, Modal, PermissionMatrix } from "@/components/ui";
 import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
+import { useLoading } from "@/context/LoadingContext";
 
 export default function ConfigurationsPage() {
   const [activeTab, setActiveTab] = useState("roles"); // "company", "roles", "taxes"
@@ -35,7 +36,7 @@ export default function ConfigurationsPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Configurations</h1>
-          <p className="text-sm text-gray-500">Manage your organization's settings, roles, and tax structures.</p>
+          <p className="text-sm text-gray-500">Control organizational settings, role assignments, and tax details</p>
         </div>
       </div>
 
@@ -83,7 +84,7 @@ export default function ConfigurationsPage() {
 /* ─────────────────────────────────── */
 function TaxesTab() {
   const [taxes, setTaxes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useLoading();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTax, setEditingTax] = useState(null);
   const toast = useToast();
@@ -197,7 +198,7 @@ function TaxesTab() {
 /* ─────────────────────────────────── */
 function RolesTab() {
   const [roles, setRoles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useLoading();
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState(null);

@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { Plus, Trash2, Edit2, CheckCircle2, X } from "lucide-react";
 import { Btn, InputField, Select, Textarea, Table, Modal } from "@/components/ui";
+import { useLoading } from "@/context/LoadingContext";
 
 /**
  * AddItemModal Content
@@ -166,7 +167,7 @@ function AddItemModal({ onAdd, onClose }) {
 }
 
 export default function InvoiceForm({ onClose }) {
-  const [loading, setLoading] = useState(false);
+  const { loading, setLoading } = useLoading();
   const [success, setSuccess] = useState(false);
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   

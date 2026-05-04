@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState } from "react";
-
+import { Loader } from "@/components/ui/Loader";
 
 const LoadingContext = createContext({
   loading: false,
@@ -13,6 +13,7 @@ export const LoadingProvider = ({ children }) => {
 
   return (
     <LoadingContext.Provider value={{ loading, setLoading }}>
+      {loading && <Loader fullScreen={true} />}
       {children}
     </LoadingContext.Provider>
   );

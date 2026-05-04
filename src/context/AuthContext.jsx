@@ -52,7 +52,13 @@ export const AuthProvider = ({ children }) => {
     const decoded = decodeToken(access);
     if (decoded) {
       setAccessToken(access);
-      setUser({ user_id: user_id || decoded.user_id, email: decoded.email, token: decoded });
+      setUser({ 
+        user_id: user_id || decoded.user_id, 
+        email: decoded.email, 
+        role: decoded.role, 
+        permissions: decoded.permissions || {}, 
+        token: decoded 
+      });
       setIsAuthenticated(true);
     }
   };
@@ -77,11 +83,18 @@ setAccessToken(null);
 
     if (decoded) {
       const isExpired = decoded.exp * 1000 < Date.now();
-      if (isExpired) {
+      // If token is expired or missing the newly added 'role' field, force re-login
+      if (isExpired || !decoded.role) {
         logout();
       } else {
         setAccessToken(token);
-         setUser({ user_id: decoded.user_id, email: decoded.email, token: decoded });
+        setUser({ 
+          user_id: decoded.user_id, 
+          email: decoded.email, 
+          role: decoded.role, 
+          permissions: decoded.permissions || {}, 
+          token: decoded 
+        });
         setIsAuthenticated(true);
       }
     } else {

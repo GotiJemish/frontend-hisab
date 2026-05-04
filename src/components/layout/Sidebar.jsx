@@ -22,14 +22,17 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
   const userId = params?.userId || "";
   
   const isAdmin = user?.role === "COMPANY_ADMIN" || user?.role === "SUPER_ADMIN";
+  const perms = user?.permissions || {};
 
   const NAV_ITEMS = [
     { href: `/${userId}`,          label: "Dashboard",  icon: LayoutDashboard, show: true },
     { href: `/${userId}/users`,           label: "Users",           icon: Users, show: isAdmin },
+    { href: `/${userId}/roles`,           label: "Roles",           icon: Shield, show: isAdmin },
     { href: `/${userId}/configurations`,  label: "Configurations",  icon: Settings, show: isAdmin },
-    { href: `/${userId}/items`,           label: "Products",        icon: ShoppingBag, show: true },
-    { href: `/${userId}/orders`,   label: "Orders",     icon: Inbox, show: true },
-    { href: `/${userId}/reports`,  label: "Reports",    icon: FileText, show: true },
+    { href: `/${userId}/items`,           label: "Products",        icon: ShoppingBag, show: isAdmin || perms.items === true || perms.items?.read },
+    { href: `/${userId}/invoices`,        label: "Invoices",        icon: Inbox, show: isAdmin || perms.invoices === true || perms.invoices?.read },
+    { href: `/${userId}/contacts`,        label: "Contacts",        icon: Users, show: isAdmin || perms.contacts === true || perms.contacts?.read },
+    { href: `/${userId}/reports`,  label: "Reports",    icon: FileText, show: isAdmin },
   ];
 
   const BOTTOM_ITEMS = [

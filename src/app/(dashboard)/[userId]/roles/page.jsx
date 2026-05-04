@@ -5,10 +5,11 @@ import { Plus, Search, RefreshCw, Trash2, Edit } from "lucide-react";
 import { Btn, Card, InputField, Table, Modal, PermissionMatrix } from "@/components/ui";
 import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
+import { useLoading } from "@/context/LoadingContext";
 
 export default function RolesPage() {
   const [roles, setRoles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { loading, setLoading } = useLoading();
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
@@ -114,7 +115,7 @@ export default function RolesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Role Management</h1>
-          <p className="text-sm text-gray-500">Configure default permissions for your organization's roles.</p>
+          <p className="text-sm text-gray-500">Manage standard permissions across organizational roles</p>
         </div>
         <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => handleOpenModal()}>
           Create Role

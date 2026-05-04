@@ -1,103 +1,121 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Download, RefreshCw, Search, Eye, Pencil, Trash2 } from "lucide-react";
-import { Btn } from "@/components/ui";
-import { Card } from "@/components/ui";
-import { Alert } from "@/components/ui";
-import { InputField } from "@/components/ui";
-import { Table } from "@/components/ui";
-import { Modal } from "@/components/ui";
-import InvoiceForm from "@/components/features/invoices/InvoiceForm";
+import { useState, useEffect } from "react";
+import { Plus, Download, RefreshCw, Search, Eye, Users, FileText, Banknote, Building } from "lucide-react";
+import { Btn, Card, Alert, InputField, Table } from "@/components/ui";
+import apiClient from "@/utilities/apiClients";
+import { useToast } from "@/context/ToastContext";
+import { useLoading } from "@/context/LoadingContext";
+import { useRouter, useParams } from "next/navigation";
 
-// ── Sample data ──────────────────────────────────────────────────
-const STAT_CARDS = [
-  { label: "Total Revenue", value: "₹1,24,500", change: "+12.5%", positive: true },
-  { label: "Active Users", value: "3,482", change: "+8.1%", positive: true },
-  { label: "Pending Bills", value: "47", change: "-3.2%", positive: false },
-  { label: "Paid Invoices", value: "284", change: "+21.4%", positive: true },
-];
-
-const SAMPLE_ROWS = [
-  { id: "INV-001", client: "Ravi Enterprises", amount: "₹12,500", date: "2026-03-15", status: "paid" },
-  { id: "INV-002", client: "Sharma & Co.", amount: "₹8,200", date: "2026-03-16", status: "pending" },
-  { id: "INV-003", client: "Blue Horizon Ltd.", amount: "₹34,000", date: "2026-03-10", status: "overdue" },
-  { id: "INV-004", client: "TechSpace Pvt.", amount: "₹6,750", date: "2026-03-18", status: "paid" },
-  { id: "INV-005", client: "Nirmala Traders", amount: "₹2,900", date: "2026-03-19", status: "pending" },
-];
-
-const STATUS_MAP = {
-  paid: { label: "Paid", cls: "bg-[#F0FDF4] text-[#166534] dark:bg-[#052E16]/40 dark:text-[#22C55E]" },
-  pending: { label: "Pending", cls: "bg-[#FFFBEB] text-[#92400E] dark:bg-[#451A03]/40 dark:text-[#FBBF24]" },
-  overdue: { label: "Overdue", cls: "bg-[#FEF2F2] text-[#991B1B] dark:bg-[#450A0A]/40 dark:text-[#F87171]" },
-};
-
-const TABLE_COLUMNS = [
-  { key: "id", header: "Invoice ID" },
-  { key: "client", header: "Client" },
-  { key: "amount", header: "Amount", align: "right" },
-  { key: "date", header: "Date" },
-  {
-    key: "status",
-    header: "Status",
-    align: "center",
-    render: (value) => {
-      const s = STATUS_MAP[value] ?? STATUS_MAP.pending;
-      return (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${s.cls}`}>
-          {s.label}
-        </span>
-      );
-    },
-  },
-  {
-    key: "__actions",
-    header: "Actions",
-    align: "center",
-    render: (_v, row) => (
-      <div className="flex items-center justify-center gap-1.5">
-        <button
-          type="button"
-          aria-label={`View ${row.id}`}
-          className="rounded-lg p-1.5 text-[#0EA5E9] hover:bg-[#F0F9FF] dark:hover:bg-[#082F49]/40 transition-colors"
-        >
-          <Eye className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          aria-label={`Edit ${row.id}`}
-          className="rounded-lg p-1.5 text-[#F59E0B] hover:bg-[#FFFBEB] dark:hover:bg-[#451A03]/40 transition-colors"
-        >
-          <Pencil className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          aria-label={`Delete ${row.id}`}
-          className="rounded-lg p-1.5 text-[#EF4444] hover:bg-[#FEF2F2] dark:hover:bg-[#450A0A]/40 transition-colors"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
-    ),
-  },
-];
-
-// ─────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
+  const [invoices, setInvoices] = useState([]);
+  const [contacts, setContacts] = useState([]);
+  const { loading, setLoading } = useLoading();
   const [search, setSearch] = useState("");
-  const [modalOpen, setModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const toast = useToast();
+  const router = useRouter();
+  const params = useParams();
 
-  const filtered = SAMPLE_ROWS.filter(
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [invRes, conRes] = await Promise.all([
+        apiClient.get("/invoices/"),
+        apiClient.get("/contacts/")
+      ]);
+      if (invRes.data.success) setInvoices(invRes.data.data || []);
+      if (conRes.data.success) setContacts(conRes.data.data || []);
+    } catch (err) {
+      toast.error("Failed to load dashboard data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Compute Stats
+  const totalRevenue = invoices.reduce((acc, inv) => acc + parseFloat(inv.total_amount || 0), 0);
+  const totalContacts = contacts.length;
+  const customers = contacts.filter(c => c.payment_type === "receivable").length;
+  const vendors = contacts.filter(c => c.payment_type === "payable").length;
+  const invoicesThisMonth = invoices.filter(inv => {
+    const invDate = new Date(inv.invoice_date);
+    const now = new Date();
+    return invDate.getMonth() === now.getMonth() && invDate.getFullYear() === now.getFullYear();
+  }).length;
+
+  const STAT_CARDS = [
+    { label: "Total Revenue", value: `₹${totalRevenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, icon: <Banknote className="h-6 w-6 text-green-500" />, positive: true },
+    { label: "Total Contacts", value: totalContacts, icon: <Users className="h-6 w-6 text-blue-500" />, positive: true },
+    { label: "Customers", value: customers, icon: <Building className="h-6 w-6 text-indigo-500" />, positive: true },
+    { label: "Invoices This Month", value: invoicesThisMonth, icon: <FileText className="h-6 w-6 text-purple-500" />, positive: true },
+  ];
+
+  // Map contacts for table display
+  const getContactName = (id) => {
+    const c = contacts.find(c => c.id === id);
+    return c ? c.name : "Unknown";
+  };
+
+  // Sort and take top 5 for brief list
+  const recentInvoices = [...invoices].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5);
+  
+  const filtered = recentInvoices.filter(
     (r) =>
-      r.client.toLowerCase().includes(search.toLowerCase()) ||
-      r.id.toLowerCase().includes(search.toLowerCase())
+      getContactName(r.contact).toLowerCase().includes(search.toLowerCase()) ||
+      r.bill_id.toLowerCase().includes(search.toLowerCase())
   );
 
-  function simulateRefresh() {
-    setLoading(true);
-    setTimeout(() => setLoading(false), 1800);
-  }
+  const TABLE_COLUMNS = [
+    { key: "bill_id", header: "Invoice ID" },
+    { key: "contact", header: "Client", render: (val) => getContactName(val) },
+    { key: "total_amount", header: "Amount", align: "right", render: (val) => `₹${parseFloat(val).toFixed(2)}` },
+    { key: "invoice_date", header: "Date" },
+    {
+      key: "invoice_type",
+      header: "Type",
+      align: "center",
+      render: (value) => (
+        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-[#EFF6FF] text-[#1D4ED8] dark:bg-[#1E3A8A]/40 dark:text-[#93C5FD] uppercase tracking-wider">
+          {value.replace('_', ' ')}
+        </span>
+      ),
+    },
+    {
+      key: "__actions",
+      header: "Actions",
+      align: "center",
+      render: (_v, row) => (
+        <div className="flex items-center justify-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => router.push(`/${params.userId}/invoices`)}
+            className="rounded-lg p-1.5 text-[#0EA5E9] hover:bg-[#F0F9FF] dark:hover:bg-[#082F49]/40 transition-colors"
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  // Calculate Basic Chart Data (Revenue by Contact - Top 5)
+  const revenueByContact = invoices.reduce((acc, inv) => {
+    const name = getContactName(inv.contact);
+    acc[name] = (acc[name] || 0) + parseFloat(inv.total_amount || 0);
+    return acc;
+  }, {});
+  
+  const chartData = Object.entries(revenueByContact)
+    .map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5);
+    
+  const maxAmount = chartData.length > 0 ? Math.max(...chartData.map(d => d.amount)) : 1;
 
   return (
     <div className="space-y-6">
@@ -105,109 +123,122 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-[#0F172A] dark:text-[#E2E8F0]">
-            Dashboard
+            Dashboard overview
           </h1>
           <p className="text-sm text-[#94A3B8] dark:text-[#6B7280] mt-0.5">
-            Welcome back, Admin. Here's what's happening today.
+            Instant view of billing and contact details
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Btn
-            variant="ghost"
-            size="sm"
-            leftIcon={<Download className="h-4 w-4" />}
-          >
-            Export
-          </Btn>
-          <Btn
             variant="primary"
             size="sm"
             leftIcon={<Plus className="h-4 w-4" />}
-            onClick={() => setModalOpen(true)}
+            onClick={() => router.push(`/${params.userId}/invoices`)}
           >
             New Invoice
           </Btn>
         </div>
       </div>
 
-      {/* ── Alert ── */}
-      <Alert variant="info" title="Month-end reporting" dismissible>
-        Your March 2026 report is ready to review. Click Export to download.
-      </Alert>
-
       {/* ── Stat cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {STAT_CARDS.map((card) => (
           <Card key={card.label} hover>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8] dark:text-[#6B7280]">
-              {card.label}
-            </p>
-            <p className="mt-2 text-3xl font-bold text-[#0F172A] dark:text-[#E2E8F0]">
-              {card.value}
-            </p>
-            <span
-              className={`mt-1 text-sm font-medium ${card.positive
-                ? "text-[#22C55E]"
-                : "text-[#EF4444] dark:text-[#F87171]"
-                }`}
-            >
-              {card.change} from last month
-            </span>
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8] dark:text-[#6B7280]">
+                  {card.label}
+                </p>
+                <p className="mt-2 text-2xl lg:text-3xl font-bold text-[#0F172A] dark:text-[#E2E8F0] tracking-tight">
+                  {card.value}
+                </p>
+              </div>
+              <div className="p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                {card.icon}
+              </div>
+            </div>
           </Card>
         ))}
       </div>
 
-      {/* ── Invoice table ── */}
-      <Card
-        header={
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="font-semibold text-[#0F172A] dark:text-[#E2E8F0]">
-              Recent Invoices
-            </h2>
-            <div className="flex items-center gap-2">
-              <InputField
-                id="invoice-search"
-                type="search"
-                placeholder="Search invoices…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                leftIcon={<Search className="h-4 w-4" />}
-                className="w-full sm:w-64"
-              />
-              <Btn
-                variant="ghost"
-                size="sm"
-                leftIcon={<RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />}
-                onClick={simulateRefresh}
-                aria-label="Refresh table"
-              >
-                Refresh
-              </Btn>
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* ── CSS Basic Chart ── */}
+        <Card header={<h2 className="font-semibold text-gray-900 dark:text-white">Top Customers by Revenue</h2>} className="lg:col-span-1">
+          <div className="space-y-4 pt-2">
+            {chartData.length > 0 ? (
+              chartData.map((data, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium text-gray-700 dark:text-gray-300 truncate w-32">{data.name}</span>
+                    <span className="text-gray-900 dark:text-gray-100 font-semibold">₹{data.amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5">
+                    <div 
+                      className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full" 
+                      style={{ width: `${(data.amount / maxAmount) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+                <FileText className="h-8 w-8 mb-2 opacity-50" />
+                <p className="text-sm">No data to display</p>
+              </div>
+            )}
           </div>
-        }
-      >
-        <div className="-mx-5 -mb-5">
-          <Table
-            columns={TABLE_COLUMNS}
-            data={filtered}
-            striped
-            hoverable
-            loading={loading}
-            emptyMessage="No invoices match your search."
-          />
-        </div>
-      </Card>
+        </Card>
 
-      {/* ── New Invoice Modal ── */}
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="New Sale Invoice"
-        size="full"
-      >
-        <InvoiceForm onClose={() => setModalOpen(false)} />
-      </Modal>
+        {/* ── Invoice table ── */}
+        <div className="lg:col-span-2">
+          <Card
+            header={
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <h2 className="font-semibold text-[#0F172A] dark:text-[#E2E8F0]">
+                  Recent Invoices
+                </h2>
+                <div className="flex items-center gap-2">
+                  <InputField
+                    id="invoice-search"
+                    type="search"
+                    placeholder="Search recent..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    leftIcon={<Search className="h-4 w-4" />}
+                    className="w-full sm:w-48"
+                  />
+                  <Btn
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />}
+                    onClick={fetchData}
+                    aria-label="Refresh table"
+                  >
+                    Refresh
+                  </Btn>
+                </div>
+              </div>
+            }
+          >
+            <div className="-mx-5 -mb-5">
+              <Table
+                columns={TABLE_COLUMNS}
+                data={filtered}
+                striped
+                hoverable
+                loading={loading}
+                emptyMessage="No recent invoices."
+              />
+            </div>
+            <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex justify-center bg-gray-50 dark:bg-gray-800/50 -mx-5 -mb-5 mt-5">
+               <button onClick={() => router.push(`/${params.userId}/invoices`)} className="text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                  View All Invoices &rarr;
+               </button>
+            </div>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
