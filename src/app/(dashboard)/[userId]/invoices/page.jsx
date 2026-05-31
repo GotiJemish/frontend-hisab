@@ -6,6 +6,9 @@ import { Btn, Card, InputField, Table, Modal } from "@/components/ui";
 import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
 import { useLoading } from "@/context/LoadingContext";
+import { useAuth } from "@/context/AuthContext";
+import AppSelect from "@/components/ui/AppSelect";
+import ItemFormModal from "../items/components/ItemFormModal";
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState([]);
@@ -20,6 +23,20 @@ export default function InvoicesPage() {
   const [itemsList, setItemsList] = useState([]);
   const [taxesList, setTaxesList] = useState([]);
   const [availableNumbers, setAvailableNumbers] = useState([]);
+  
+  // New Item Modal State
+  const [itemModalOpen, setItemModalOpen] = useState(false);
+  const [itemAddingIndex, setItemAddingIndex] = useState(null);
+  const [itemFormData, setItemFormData] = useState({
+    name: "",
+    type: "service",
+    unit_type: "Pcs",
+    tax_category: "none",
+    rate: "",
+    discount: "",
+    with_tax: false,
+    sac: "",
+  });
 
   const toast = useToast();
 
@@ -95,6 +112,22 @@ export default function InvoicesPage() {
 
   // Item Handlers
   const handleItemChange = (index, field, value) => {
+    if (field === "item_id" && value === "new-item") {
+      setItemAddingIndex(index);
+      setItemFormData({
+        name: "",
+        type: "service",
+        unit_type: "Pcs",
+        tax_category: "none",
+        rate: "",
+        discount: "",
+        with_tax: false,
+        sac: "",
+      });
+      setItemModalOpen(true);
+      return;
+    }
+
     const newItems = [...formData.items];
     newItems[index][field] = value;
     
@@ -102,11 +135,51 @@ export default function InvoicesPage() {
     if (field === "item_id" && value) {
       const selectedItem = itemsList.find(i => i.id == value);
       if (selectedItem) {
-        newItems[index].rate = selectedItem.sale_price || 0;
+        newItems[index].rate = selectedItem.rate || 0;
         newItems[index].description = selectedItem.name || "";
       }
     }
     setFormData({ ...formData, items: newItems });
+  };
+
+  const handleItemSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const payload = {
+        ...itemFormData,
+        rate: parseFloat(itemFormData.rate) || 0,
+        discount: parseFloat(itemFormData.discount) || 0,
+        sac: parseInt(itemFormData.sac, 10) || 0,
+      };
+      
+      const res = await apiClient.post("/items/", payload);
+
+      if (res.data.success) {
+        toast.success(res.data.message || "Item created successfully");
+        setItemModalOpen(false);
+        // Refresh items list
+        const itmRes = await apiClient.get("/items/");
+        if (itmRes.data.success) {
+          const newItemsList = itmRes.data.data || [];
+          setItemsList(newItemsList);
+          
+          // Auto-select the newly created item
+          const createdItem = res.data.data || newItemsList.find(i => i.name === itemFormData.name);
+          if (createdItem && itemAddingIndex !== null) {
+            const newItems = [...formData.items];
+            newItems[itemAddingIndex].item_id = createdItem.id;
+            newItems[itemAddingIndex].rate = createdItem.rate || 0;
+            newItems[itemAddingIndex].description = createdItem.name || "";
+            setFormData({ ...formData, items: newItems });
+          }
+        }
+      }
+    } catch (err) {
+      toast.error("Failed to save item");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const addItemRow = () => {
@@ -339,14 +412,17 @@ export default function InvoicesPage() {
                     <tr key={index} className="bg-white dark:bg-[#1E293B]">
                       <td className="px-4 py-2">
                         <div className="space-y-2">
-                          <select
-                            value={item.item_id}
-                            onChange={(e) => handleItemChange(index, "item_id", e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-[#0F172A]"
-                          >
-                            <option value="">Select Item (Optional)</option>
-                            {itemsList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-                          </select>
+                          {/* ITEM SELECTION */}
+                          <AppSelect
+                            options={[
+                              ...itemsList.map(i => ({ value: i.id, label: i.name })),
+                              { value: "new-item", label: "+ Add New Item" }
+                            ]}
+                            value={itemsList.find(i => i.id == item.item_id) ? { value: item.item_id, label: itemsList.find(i => i.id == item.item_id).name } : null}
+                            onChange={(selected) => handleItemChange(index, "item_id", selected?.value)}
+                            placeholder="Select Item"
+                          />
+
                           <input
                             type="text"
                             placeholder="Description"
@@ -522,6 +598,15 @@ export default function InvoicesPage() {
           </div>
         )}
       </Modal>
+
+      <ItemFormModal
+        open={itemModalOpen}
+        onClose={() => setItemModalOpen(false)}
+        formData={itemFormData}
+        setFormData={setItemFormData}
+        handleSubmit={handleItemSubmit}
+        loading={loading}
+      />
     </div>
   );
 }

@@ -16,7 +16,7 @@ const Alert = ({
   showLink = false,
   linkHref = "#",
   linkText = "Learn more",
-  closeToast = () => {},
+  closeToast = () => { },
 }) => {
   // Tailwind classes for each variant
   const variantClasses = {

@@ -1,15 +1,23 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Plus, Trash2, Edit2, CheckCircle2, X } from "lucide-react";
-import { Btn, InputField, Select, Textarea, Table, Modal } from "@/components/ui";
+import { Btn, InputField, Select, Textarea, Table, Modal, AppSelect } from "@/components/ui";
 import { useLoading } from "@/context/LoadingContext";
+import { useToast } from "@/context/ToastContext";
+import apiClient from "@/utilities/apiClients";
+import AddItemMasterModal from "@/components/features/items/AddItemModal";
+import AddContactModal from "@/components/features/contacts/AddContactModal";
 
 /**
  * AddItemModal Content
  * Handles the logic for adding a single item with complex calculations
  */
-function AddItemModal({ onAdd, onClose }) {
+/**
+ * LineItemForm Content
+ * Handles the logic for adding a single line item to the invoice
+ */
+function LineItemForm({ onAdd, onClose }) {
   const [item, setItem] = useState({
     name: "",
     qty: 1.0,
@@ -17,7 +25,34 @@ function AddItemModal({ onAdd, onClose }) {
     discount: 0.0,
     discountType: "amount", // "percent" or "amount"
     description: "",
+    itemId: null,
   });
+
+  const [masterItems, setMasterItems] = useState([]);
+  const [isMasterModalOpen, setIsMasterModalOpen] = useState(false);
+  const [tempItemName, setTempItemName] = useState("");
+  const toast = useToast();
+
+  const fetchMasterItems = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get("/items/");
+      if (data.success) {
+        setMasterItems(data.data.map(i => ({ 
+          value: i.id, 
+          label: i.name,
+          rate: i.rate,
+          tax: i.tax_category,
+          type: i.type
+        })));
+      }
+    } catch (err) {
+      console.error("Failed to load master items", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMasterItems();
+  }, [fetchMasterItems]);
 
   const [errors, setErrors] = useState({});
 
@@ -47,26 +82,79 @@ function AddItemModal({ onAdd, onClose }) {
     onClose();
   };
 
+  const handleCreateNewItem = (name) => {
+    setTempItemName(name);
+    setIsMasterModalOpen(true);
+  };
+
+  const handleMasterItemCreated = (newItem) => {
+    const option = { 
+      value: newItem.id, 
+      label: newItem.name,
+      rate: newItem.rate,
+      tax: newItem.tax_category
+    };
+    setMasterItems(prev => [...prev, option]);
+    setItem({ 
+      ...item, 
+      name: newItem.name, 
+      itemId: newItem.id,
+      rate: newItem.rate 
+    });
+    setErrors({});
+  };
+
   return (
     <div className="space-y-6 pt-2">
+      <AddItemMasterModal 
+        open={isMasterModalOpen}
+        onClose={() => setIsMasterModalOpen(false)}
+        onSuccess={handleMasterItemCreated}
+        initialName={tempItemName}
+      />
+
       <div className="space-y-1">
-        <Select
-          id="item-name"
-          label="Items Name or Code"
-          value={item.name}
-          onChange={(e) => {
-            setItem({ ...item, name: e.target.value });
-            if (e.target.value) setErrors({});
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-semibold mb-1 dark:text-gray-300 block">Items Name or Code*</label>
+          <button 
+            type="button" 
+            onClick={() => handleCreateNewItem("")}
+            className="text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] dark:text-[#3B82F6] dark:hover:text-[#60A5FA] flex items-center gap-1 transition-colors"
+          >
+            <Plus className="h-3 w-3" />
+            Create New Item
+          </button>
+        </div>
+        <AppSelect
+          placeholder="Search or Create Item..."
+          options={masterItems}
+          value={masterItems.find(o => o.label === item.name) || (item.name ? { label: item.name, value: item.itemId } : null)}
+          formatOptionLabel={(opt) => (
+            <div className="flex justify-between items-center w-full">
+              <span className="font-medium">{opt.label}</span>
+              <div className="flex items-center gap-3 text-[10px] uppercase font-bold">
+                <span className="text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded">₹{opt.rate}</span>
+                <span className="text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{opt.type}</span>
+              </div>
+            </div>
+          )}
+          onChange={(opt) => {
+            if (opt) {
+              setItem({ 
+                ...item, 
+                name: opt.label, 
+                itemId: opt.value,
+                rate: opt.rate || item.rate
+              });
+              setErrors({});
+            } else {
+              setItem({ ...item, name: "", itemId: null });
+            }
           }}
-          required
-          error={errors.name}
-          className={errors.name ? "[&_select]:border-[#EF4444]" : ""}
-          options={[
-            { value: "", label: "Select Item" },
-            { value: "Item A", label: "Item A" },
-            { value: "Item B", label: "Item B" },
-          ]}
+          onCreateOption={handleCreateNewItem}
+          className={errors.name ? "border-red-500" : ""}
         />
+        {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
       </div>
 
       {/* Row 1: Qty x Rate = Result */}
@@ -178,11 +266,35 @@ export default function InvoiceForm({ onClose }) {
     supplyType: "Regular",
     date: new Date().toISOString().split("T")[0],
     billTo: "",
+    billToId: null,
     partyChallan: "",
     internalNotes: "",
     notes: "",
     roundOff: 0,
   });
+
+  const [contacts, setContacts] = useState([]);
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+  const [tempContactName, setTempContactName] = useState("");
+
+  const fetchContacts = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get("/contacts/");
+      if (data.success) {
+        setContacts(data.data.map(c => ({ 
+          value: c.id, 
+          label: c.name,
+          mobile: c.mobile
+        })));
+      }
+    } catch (err) {
+      console.error("Failed to load contacts", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchContacts();
+  }, [fetchContacts]);
 
   // ── Items Table State ──
   const [items, setItems] = useState([]); // Start empty now
@@ -210,6 +322,21 @@ export default function InvoiceForm({ onClose }) {
   // ── Handlers ──
   const handleFormChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateNewContact = (name) => {
+    setTempContactName(name);
+    setIsContactModalOpen(true);
+  };
+
+  const handleContactCreated = (newContact) => {
+    const option = { 
+      value: newContact.id, 
+      label: newContact.name,
+      mobile: newContact.mobile
+    };
+    setContacts(prev => [...prev, option]);
+    setForm(prev => ({ ...prev, billTo: newContact.name, billToId: newContact.id }));
   };
 
   const handleSubmit = async (e) => {
@@ -286,7 +413,7 @@ export default function InvoiceForm({ onClose }) {
         title="New Sale Item"
         size="md"
       >
-        <AddItemModal 
+        <LineItemForm 
           onAdd={addItemToMainList} 
           onClose={() => setIsItemModalOpen(false)} 
         />
@@ -294,16 +421,17 @@ export default function InvoiceForm({ onClose }) {
 
       {/* ── Header Fields ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Select
-          id="invoice-book"
-          label="Invoice Book"
-          value={form.invoiceBook}
-          onChange={(e) => handleFormChange("invoiceBook", e.target.value)}
-          options={[
-            { value: "Delivery Challan", label: "Delivery Challan" },
-            { value: "Sale Invoice", label: "Sale Invoice" },
-          ]}
-        />
+        <div className="space-y-1">
+          <label className="text-sm font-semibold mb-1 dark:text-gray-300 block">Invoice Book</label>
+          <AppSelect
+            options={[
+              { value: "Delivery Challan", label: "Delivery Challan" },
+              { value: "Sale Invoice", label: "Sale Invoice" },
+            ]}
+            value={{ value: form.invoiceBook, label: form.invoiceBook }}
+            onChange={(opt) => handleFormChange("invoiceBook", opt?.value || "")}
+          />
+        </div>
         <div className="flex items-end gap-2">
           <Select
             id="invoice-number"
@@ -324,17 +452,18 @@ export default function InvoiceForm({ onClose }) {
             Skip
           </button>
         </div>
-        <Select
-          id="supply-type"
-          label="Supply Type"
-          value={form.supplyType}
-          onChange={(e) => handleFormChange("supplyType", e.target.value)}
-          options={[
-            { value: "Regular", label: "Regular" },
-            { value: "Export", label: "Export" },
-            { value: "Taxable", label: "Taxable" },
-          ]}
-        />
+        <div className="space-y-1">
+          <label className="text-sm font-semibold mb-1 dark:text-gray-300 block">Supply Type</label>
+          <AppSelect
+            options={[
+              { value: "Regular", label: "Regular" },
+              { value: "Export", label: "Export" },
+              { value: "Taxable", label: "Taxable" },
+            ]}
+            value={{ value: form.supplyType, label: form.supplyType }}
+            onChange={(opt) => handleFormChange("supplyType", opt?.value || "")}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -355,19 +484,42 @@ export default function InvoiceForm({ onClose }) {
         />
       </div>
 
-      <Select
-        id="bill-to"
-        label="Bill To"
-        required
-        value={form.billTo}
-        onChange={(e) => handleFormChange("billTo", e.target.value)}
-        options={[
-          { value: "", label: "Select Party" },
-          { value: "ravi_ent", label: "Ravi Enterprises" },
-          { value: "sharma_co", label: "Sharma & Co." },
-          { value: "blue_hor", label: "Blue Horizon Ltd." },
-        ]}
+      {/* ── Contact Modal ── */}
+      <AddContactModal
+        open={isContactModalOpen}
+        onClose={() => setIsContactModalOpen(false)}
+        onSuccess={handleContactCreated}
+        initialName={tempContactName}
       />
+
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-semibold mb-1 dark:text-gray-300 block">Bill To*</label>
+          <button 
+            type="button" 
+            onClick={() => handleCreateNewContact("")}
+            className="text-xs font-bold text-[#2563EB] hover:text-[#1D4ED8] dark:text-[#3B82F6] dark:hover:text-[#60A5FA] flex items-center gap-1 transition-colors"
+          >
+            <Plus className="h-3 w-3" />
+            Create New Party
+          </button>
+        </div>
+        <AppSelect
+          placeholder="Search or Create Party (Customer/Vendor)..."
+          options={contacts}
+          value={contacts.find(o => o.value === form.billToId) || (form.billTo ? { label: form.billTo, value: form.billToId } : null)}
+          onChange={(opt) => {
+            if (opt) {
+              handleFormChange("billTo", opt.label);
+              handleFormChange("billToId", opt.value);
+            } else {
+              handleFormChange("billTo", "");
+              handleFormChange("billToId", null);
+            }
+          }}
+          onCreateOption={handleCreateNewContact}
+        />
+      </div>
 
       {/* ── Items Table ── */}
       <div className="space-y-3">

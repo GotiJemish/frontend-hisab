@@ -10,7 +10,7 @@ import { createPortal } from "react-dom";
  * @param {boolean}           open        - controls visibility
  * @param {() => void}        onClose     - called when backdrop or × is clicked
  * @param {string}            title       - optional modal title
- * @param {"sm"|"md"|"lg"|"xl"|"full"}  size
+ * @param {"sm"|"md"|"lg"|"xl"|"2xl"|"3xl"|"4xl"|"5xl"|"full"}  size
  * @param {boolean}           closeable   - show the × button and allow backdrop click
  * @param {React.ReactNode}   footer      - optional footer slot (for action buttons)
  * @param {string}            className   - extra classes on the panel
@@ -57,11 +57,15 @@ export default function Modal({
   if (!open) return null;
 
   const sizeClasses = {
-    sm:   "max-w-sm",
-    md:   "max-w-lg",
-    lg:   "max-w-2xl",
-    xl:   "max-w-4xl",
-    full: "max-w-[95vw]",
+    sm:    "max-w-md",
+    md:    "max-w-2xl",
+    lg:    "max-w-screen-lg", // 1024px (Container size)
+    xl:    "max-w-screen-xl",
+    "2xl": "max-w-2xl",
+    "3xl": "max-w-3xl",
+    "4xl": "max-w-4xl",
+    "5xl": "max-w-5xl",
+    full:  "max-w-[95vw]",
   };
 
   const content = (
@@ -86,12 +90,13 @@ export default function Modal({
           relative z-10 w-full ${sizeClasses[size]} rounded-2xl border
           bg-white shadow-2xl focus:outline-none
           border-[#E2E8F0] dark:bg-[#111827] dark:border-[#1F2937]
+          flex flex-col max-h-[90vh]
           ${className}
         `}
       >
         {/* Header */}
         {(title || closeable) && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] dark:border-[#1F2937]">
+          <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0] dark:border-[#1F2937]">
             {title && (
               <h2
                 id="modal-title"
@@ -114,13 +119,13 @@ export default function Modal({
         )}
 
         {/* Body */}
-        <div className="px-6 py-5 text-sm text-[#475569] dark:text-[#9CA3AF] leading-relaxed">
+        <div className="flex-1 overflow-y-auto px-6 py-5 text-sm text-[#475569] dark:text-[#9CA3AF] leading-relaxed">
           {children}
         </div>
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E2E8F0] dark:border-[#1F2937] bg-[#F8FAFC] dark:bg-[#0F172A] rounded-b-2xl">
+          <div className="flex-shrink-0 flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E2E8F0] dark:border-[#1F2937] bg-[#F8FAFC] dark:bg-[#0F172A] rounded-b-2xl">
             {footer}
           </div>
         )}

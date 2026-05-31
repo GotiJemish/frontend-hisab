@@ -59,6 +59,8 @@ export function middleware(request) {
           hasAccess = isAdmin || perms.invoices === true || perms.invoices?.read;
         } else if (module === "contacts") {
           hasAccess = isAdmin || perms.contacts === true || perms.contacts?.read;
+        } else if (module === "accounts") {
+          hasAccess = isAdmin || perms.accounts === true || perms.accounts?.read;
         }
         
         if (!hasAccess) {

@@ -7,6 +7,7 @@ export const PERMISSION_MODULES = [
   { id: "taxes", label: "Taxes (GST)" },
   { id: "items", label: "Items & Inventory" },
   { id: "contacts", label: "Contacts & Customers" },
+  { id: "accounts", label: "Accounts & Cash Flow" },
 ];
 
 export const ACTIONS = ["create", "read", "update", "delete"];

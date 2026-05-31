@@ -11,6 +11,7 @@ export { default as ProfileDropdown } from './dropdown/ProfileDropdown';
 // Form
 export { default as InputField } from './form/Input';
 export { default as Select } from './form/Select';
+export { default as AppSelect } from './AppSelect';
 export { default as Textarea } from './form/Textarea';
 
 // Table
