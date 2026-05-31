@@ -9,7 +9,7 @@ import { useLoading } from "@/context/LoadingContext";
 import AppSelect from "@/components/ui/AppSelect";
 import ItemFormModal from "../items/components/ItemFormModal";
 
-export default function InvoicesPage() {
+export default function ChallansPage() {
   const [invoices, setInvoices] = useState([]);
   const { loading, setLoading } = useLoading();
   const [search, setSearch] = useState("");
@@ -67,7 +67,7 @@ export default function InvoicesPage() {
     invoice_number: "",
     invoice_date: new Date().toISOString().split("T")[0],
     contact: "",
-    invoice_type: "old_dc",
+    invoice_type: "delivery_challan",
     supply_type: "regular",
     party_challan_no: "",
     internal_note: "",
@@ -119,7 +119,7 @@ export default function InvoicesPage() {
       invoice_number: "",
       invoice_date: new Date().toISOString().split("T")[0],
       contact: "",
-      invoice_type: "old_dc",
+      invoice_type: "delivery_challan",
       supply_type: "regular",
       party_challan_no: "",
       internal_note: "",
@@ -160,13 +160,13 @@ export default function InvoicesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this invoice?")) return;
+    if (!confirm("Are you sure you want to delete this challan?")) return;
     try {
       await apiClient.delete(`/invoices/${id}/`);
-      toast.success("Invoice deleted successfully.");
+      toast.success("Challan deleted successfully.");
       setInvoices(invoices.filter(i => i.id !== id));
     } catch (err) {
-      toast.error("Failed to delete invoice");
+      toast.error("Failed to delete challan");
     }
   };
 
@@ -342,7 +342,7 @@ export default function InvoicesPage() {
 
       const { data } = await apiClient.post("/invoices/", payload);
       if (data.success) {
-        toast.success("Invoice created successfully");
+        toast.success("Challan created successfully");
         setModalOpen(false);
         fetchData();
       }
@@ -351,7 +351,7 @@ export default function InvoicesPage() {
         const errorMsg = typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data);
         toast.error(`Error: ${errorMsg}`);
       } else {
-        toast.error("Failed to create invoice");
+        toast.error("Failed to create challan");
       }
     } finally {
       setLoading(false);
@@ -388,7 +388,7 @@ export default function InvoicesPage() {
     doc.write(`
       <html>
         <head>
-          <title>Invoice - ${viewingInvoice.bill_id}</title>
+          <title>Challan - ${viewingInvoice.bill_id}</title>
           ${stylesHTML}
           <style>
             @media print {
@@ -514,7 +514,7 @@ export default function InvoicesPage() {
   };
 
   const filtered = invoices.filter(i => 
-    i.invoice_type === "old_dc" && (
+    i.invoice_type === "delivery_challan" && (
       i.bill_id.toLowerCase().includes(search.toLowerCase()) || 
       (i.invoice_number && i.invoice_number.toLowerCase().includes(search.toLowerCase()))
     )
@@ -527,7 +527,7 @@ export default function InvoicesPage() {
 
   const columns = [
     { key: "bill_id", header: "Bill ID", sortable: true },
-    { key: "invoice_number", header: "Invoice #", render: (val) => val || "-" },
+    { key: "invoice_number", header: "Challan #", render: (val) => val || "-" },
     { key: "invoice_date", header: "Date" },
     { key: "contact", header: "Bill To", render: (val) => getContactName(val) },
     { 
@@ -544,7 +544,7 @@ export default function InvoicesPage() {
           <button onClick={() => handleViewModal(row)} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-all" title="View & Print Details">
             <Eye className="h-4 w-4" />
           </button>
-          <button onClick={() => handleDelete(row.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-lg transition-all" title="Delete Invoice">
+          <button onClick={() => handleDelete(row.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-lg transition-all" title="Delete Challan">
             <Trash2 className="h-4 w-4" />
           </button>
         </div>
@@ -565,21 +565,21 @@ export default function InvoicesPage() {
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Invoices</h1>
-          <p className="text-sm text-gray-500">Manage and preview OLD DC Invoices</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Challans</h1>
+          <p className="text-sm text-gray-500">Manage and preview Delivery Challans</p>
         </div>
         <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={handleOpenModal}>
-          Create Invoice
+          Create Challan
         </Btn>
       </div>
 
       <Card
         header={
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900 dark:text-white">Invoice List</h2>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Challan List</h2>
             <div className="flex items-center gap-2">
               <InputField
-                id="search-invoices" type="search" placeholder="Search by Bill ID..."
+                id="search-challans" type="search" placeholder="Search by Bill ID..."
                 value={search} onChange={(e) => setSearch(e.target.value)}
                 leftIcon={<Search className="h-4 w-4" />}
               />
@@ -595,7 +595,7 @@ export default function InvoicesPage() {
              columns={columns}
              data={filtered}
              loading={loading && invoices.length === 0}
-             emptyMessage="No invoices found."
+             emptyMessage="No challans found."
              pagination={true}
              rowsPerPage={10}
              striped={true}
@@ -603,8 +603,8 @@ export default function InvoicesPage() {
         </div>
       </Card>
 
-      {/* Create Invoice Modal (Sticky Two-Column Layout) */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Create New Invoice" size="5xl">
+      {/* Create Challan Modal (Sticky Two-Column Layout) */}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Create New Challan" size="5xl">
         <form onSubmit={handleSubmit} className="space-y-6 pt-2 pb-16">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             
@@ -612,7 +612,7 @@ export default function InvoicesPage() {
             <div className="lg:col-span-2 space-y-6">
               
               <div className="bg-slate-50 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-200/60 dark:border-slate-850 space-y-4">
-                <h3 className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">Invoice Header</h3>
+                <h3 className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">Challan Header</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -629,7 +629,7 @@ export default function InvoicesPage() {
                   </div>
                   
                   <InputField
-                    label="Invoice Date"
+                    label="Challan Date"
                     type="date"
                     required
                     value={formData.invoice_date}
@@ -655,7 +655,7 @@ export default function InvoicesPage() {
                       onChange={(e) => setFormData({...formData, invoice_type: e.target.value})}
                       className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 text-sm cursor-not-allowed"
                     >
-                      <option value="old_dc">OLD DC</option>
+                      <option value="delivery_challan">Delivery Challan</option>
                     </select>
                   </div>
                   
@@ -804,7 +804,7 @@ export default function InvoicesPage() {
             {/* RIGHT COLUMN: Sticky Calculation Panel */}
             <div className="lg:sticky lg:top-4 space-y-4">
               <div className="bg-slate-50 dark:bg-slate-900/60 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-md">
-                <h3 className="text-md font-bold text-slate-800 dark:text-slate-100 border-b pb-3 mb-4">Invoice Summary</h3>
+                <h3 className="text-md font-bold text-slate-800 dark:text-slate-100 border-b pb-3 mb-4">Challan Summary</h3>
                 
                 {/* GST Type Selector */}
                 <div className="mb-4">
@@ -868,7 +868,7 @@ export default function InvoicesPage() {
                 {/* Submit Actions */}
                 <div className="pt-5 space-y-2">
                   <Btn variant="primary" type="submit" className="w-full justify-center bg-blue-600 hover:bg-blue-700 py-3 shadow-lg shadow-blue-500/20 rounded-xl" disabled={loading}>
-                    {loading ? "Saving..." : "Create Invoice"}
+                    {loading ? "Saving..." : "Create Challan"}
                   </Btn>
                   <Btn variant="outline" onClick={() => setModalOpen(false)} type="button" className="w-full justify-center rounded-xl border-slate-300 dark:border-slate-700">
                     Cancel
@@ -895,7 +895,7 @@ export default function InvoicesPage() {
       </Modal>
 
       {/* View & Print Premium Invoice Modal */}
-      <Modal open={viewModalOpen} onClose={() => setViewModalOpen(false)} title="Invoice details" size="4xl">
+      <Modal open={viewModalOpen} onClose={() => setViewModalOpen(false)} title="Challan details" size="4xl">
         {viewingInvoice && (
           <div className="space-y-6 pt-2 pb-6">
             
@@ -907,7 +907,7 @@ export default function InvoicesPage() {
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-750 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-blue-500/10 transition-all transform hover:scale-105 active:scale-95 cursor-pointer"
               >
                 <Printer className="h-4 w-4" />
-                Print / PDF Invoice
+                Print / PDF Challan
               </button>
               <button
                 type="button"
@@ -925,15 +925,15 @@ export default function InvoicesPage() {
               <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-800 pb-6">
                 <div>
                   <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-650 dark:text-blue-400 px-3.5 py-1.5 rounded-full text-xs font-black tracking-wider uppercase">
-                    Tax Invoice
+                    Delivery Challan
                   </span>
                   <h2 className="text-3xl font-black text-slate-900 dark:text-white mt-4">HISAAB LLC</h2>
                   <p className="text-xs text-slate-500 mt-1 font-semibold">GSTIN: 24AAACH1234F1Z0</p>
                 </div>
                 <div className="text-right space-y-1 text-sm font-medium">
-                  <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Invoice Details</p>
+                  <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Challan Details</p>
                   <p className="text-slate-900 dark:text-slate-100 font-extrabold">Bill ID: {viewingInvoice.bill_id}</p>
-                  <p className="text-slate-600 dark:text-slate-400">Invoice #: {viewingInvoice.invoice_number || "N/A"}</p>
+                  <p className="text-slate-600 dark:text-slate-400">Challan #: {viewingInvoice.invoice_number || "N/A"}</p>
                   <p className="text-slate-600 dark:text-slate-400">Date: {viewingInvoice.invoice_date}</p>
                 </div>
               </div>

@@ -13,6 +13,7 @@ import {
   LogOut,
   Shield,
   Wallet,
+  Receipt,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -32,6 +33,7 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
     { href: `/${userId}/configurations`,  label: "Configurations",  icon: Settings, show: isAdmin },
     { href: `/${userId}/items`,           label: "Products",        icon: ShoppingBag, show: isAdmin || perms.items === true || perms.items?.read },
     { href: `/${userId}/invoices`,        label: "Invoices",        icon: Inbox, show: isAdmin || perms.invoices === true || perms.invoices?.read },
+    { href: `/${userId}/challans`,        label: "Challans",        icon: Receipt, show: isAdmin || perms.invoices === true || perms.invoices?.read },
     { href: `/${userId}/contacts`,        label: "Contacts",        icon: Users, show: isAdmin || perms.contacts === true || perms.contacts?.read },
     { href: `/${userId}/accounts`,        label: "Accounts",        icon: Wallet, show: isAdmin || perms.accounts === true || perms.accounts?.read },
     { href: `/${userId}/reports`,  label: "Reports",    icon: FileText, show: isAdmin },
