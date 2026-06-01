@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Bell, Search, Menu, X, CheckCircle, AlertTriangle, Info } from "lucide-react";
 import ProfileDropdown from "@/components/ui/dropdown/ProfileDropdown";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Header({ toggleSidebar, toggleMobile }) {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const params = useParams();
   const userId = params?.userId || "";
+  const { user } = useAuth();
 
   return (
     <header
@@ -111,10 +113,10 @@ export default function Header({ toggleSidebar, toggleMobile }) {
         {/* Profile */}
         <ProfileDropdown
           user={{
-            name: "Admin User",
-            email: "admin@hisab.com",
-            role: "Super Admin",
-            avatarUrl: null,
+            name: user ? `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email || "User" : "Loading...",
+            email: user?.email || "",
+            role: user?.role === "COMPANY_ADMIN" ? "Company Admin" : user?.role === "SUPER_ADMIN" ? "Super Admin" : "Staff User",
+            avatarUrl: user?.profile_image_url || null,
           }}
         />
       </div>

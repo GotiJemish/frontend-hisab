@@ -1,7 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemeModeScript } from "flowbite-react";
-import { ThemeProvider } from "@/context/ThemeContext";
+import { CustomThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { ToastProvider } from "@/context/ToastContext";
 import { LoadingProvider } from "@/context/LoadingContext";
@@ -28,11 +27,8 @@ export default function RootLayout({ children }) {
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <head>
-        <ThemeModeScript />
-      </head>
       <body className="min-h-full flex flex-col">
-        <ThemeProvider>
+        <CustomThemeProvider>
           <LoadingProvider>
             <AuthProvider>
               <ToastProvider>
@@ -40,7 +36,7 @@ export default function RootLayout({ children }) {
               </ToastProvider>
             </AuthProvider>
           </LoadingProvider>
-        </ThemeProvider>
+        </CustomThemeProvider>
       </body>
     </html>
   );

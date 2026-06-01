@@ -10,12 +10,21 @@ import {
   Search,
   RefreshCw,
   Edit,
-  Trash2
+  Trash2,
+  Phone,
+  Mail,
+  Globe,
+  Hash,
+  MapPin,
+  Save,
+  ShieldAlert,
+  CreditCard
 } from "lucide-react";
 import { Btn, Card, InputField, Table, Modal, PermissionMatrix } from "@/components/ui";
 import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
 import { useLoading } from "@/context/LoadingContext";
+import { useAuth } from "@/context/AuthContext";
 
 export default function ConfigurationsPage() {
   const [activeTab, setActiveTab] = useState("roles"); // "company", "roles", "taxes"
@@ -67,13 +76,7 @@ export default function ConfigurationsPage() {
       <div className="mt-4">
         {activeTab === "roles" && <RolesTab />}
         {activeTab === "taxes" && <TaxesTab />}
-        {activeTab === "company" && (
-          <Card className="p-12 flex flex-col items-center justify-center text-center opacity-60">
-            <Building2 className="h-12 w-12 mb-4 text-gray-400" />
-            <h3 className="text-lg font-semibold">Company Profile</h3>
-            <p className="max-w-xs text-sm">General organization settings will be implemented here.</p>
-          </Card>
-        )}
+        {activeTab === "company" && <CompanyTab />}
       </div>
     </div>
   );
@@ -370,6 +373,253 @@ function RolesTab() {
           </div>
         </form>
       </Modal>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────── */
+/* Company Profile Tab Component       */
+/* ─────────────────────────────────── */
+function CompanyTab() {
+  const { user } = useAuth();
+  const { loading, setLoading } = useLoading();
+  const toast = useToast();
+  
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    website: "",
+    gstin: "",
+    pan: "",
+    address: ""
+  });
+
+  const isAdmin = user?.role === "COMPANY_ADMIN";
+
+  const fetchCompany = async () => {
+    setLoading(true);
+    try {
+      const { data } = await apiClient.get("/company/");
+      if (data.success) {
+        setFormData({
+          name: data.data.name || "",
+          email: data.data.email || "",
+          phone: data.data.phone || "",
+          website: data.data.website || "",
+          gstin: data.data.gstin || "",
+          pan: data.data.pan || "",
+          address: data.data.address || ""
+        });
+      }
+    } catch (err) {
+      toast.error("Failed to load company details");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCompany();
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!isAdmin) {
+      return toast.error("Only company administrators can edit organization profiles.");
+    }
+
+    if (!formData.name.trim()) {
+      return toast.error("Company name is required.");
+    }
+
+    if (formData.gstin && formData.gstin.trim().length !== 15) {
+      return toast.error("GSTIN must be exactly 15 characters long.");
+    }
+
+    if (formData.pan && formData.pan.trim().length !== 10) {
+      return toast.error("PAN must be exactly 10 characters long.");
+    }
+
+    setLoading(true);
+    try {
+      const { data } = await apiClient.patch("/company/", formData);
+      if (data.success) {
+        toast.success("Company profile updated successfully!");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update company details");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      {!isAdmin && (
+        <Card className="p-4 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/50 dark:border-amber-900/30 flex items-start gap-3">
+          <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <h4 className="text-sm font-bold text-amber-900 dark:text-amber-300">Read-Only Access</h4>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+              You are logged in as a Staff User. Only Company Administrators can modify the official organization profile.
+            </p>
+          </div>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="space-y-6">
+          <Card className="p-6 bg-gradient-to-br from-blue-600 to-indigo-700 text-white border-0 shadow-lg relative overflow-hidden">
+            <div className="absolute right-0 bottom-0 translate-x-6 translate-y-6 opacity-10">
+              <Building2 className="h-48 w-48" />
+            </div>
+            
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 backdrop-blur-md mb-4 text-white">
+              <Building2 className="h-6 w-6" />
+            </div>
+            
+            <h3 className="text-xl font-bold">{formData.name || "My Organization"}</h3>
+            <p className="text-xs text-blue-100 mt-1">Official Company Profile & GSTIN Settings</p>
+            
+            <div className="border-t border-white/10 my-4"></div>
+            
+            <div className="space-y-2.5 text-xs text-blue-100">
+              <div className="flex items-center gap-2">
+                <Hash className="h-3.5 w-3.5 opacity-80" />
+                <span>GSTIN: {formData.gstin || "Not Configured"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-3.5 w-3.5 opacity-80" />
+                <span>PAN: {formData.pan || "Not Configured"}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="h-3.5 w-3.5 opacity-80" />
+                <span>Phone: {formData.phone || "Not Configured"}</span>
+              </div>
+              <div className="flex items-center gap-2 font-medium">
+                <Globe className="h-3.5 w-3.5 opacity-80" />
+                <span className="truncate max-w-[200px]">{formData.website || "No Website"}</span>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-5">
+            <h4 className="font-bold text-sm text-gray-900 dark:text-white mb-2">GST Invoicing Requirements</h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+              To generate valid GST tax invoices, you must provide your company's official registered name, billing address, and 15-character GSTIN. This information is printed directly on your invoices, bills, and challans.
+            </p>
+          </Card>
+        </div>
+
+        <div className="lg:col-span-2">
+          <Card header={
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Organization Profile</h2>
+              <p className="text-xs text-gray-500">View and update official organizational details.</p>
+            </div>
+          }>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InputField
+                  label="Official Company Name"
+                  id="company-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                  disabled={!isAdmin}
+                  placeholder="e.g. Acme Corporation Pvt Ltd"
+                  leftIcon={<Building2 className="h-4 w-4" />}
+                />
+                
+                <InputField
+                  label="GSTIN (GST Identification Number)"
+                  id="company-gstin"
+                  value={formData.gstin}
+                  onChange={(e) => setFormData({ ...formData, gstin: e.target.value.toUpperCase() })}
+                  disabled={!isAdmin}
+                  placeholder="15-digit alphanumeric (e.g. 27AADCA1154K1Z5)"
+                  leftIcon={<Hash className="h-4 w-4" />}
+                  maxLength={15}
+                />
+              </div>
+
+              <InputField
+                label="PAN (Permanent Account Number)"
+                id="company-pan"
+                value={formData.pan}
+                onChange={(e) => setFormData({ ...formData, pan: e.target.value.toUpperCase() })}
+                disabled={!isAdmin}
+                placeholder="10-char alphanumeric (e.g. AAACH1234F)"
+                leftIcon={<CreditCard className="h-4 w-4" />}
+                maxLength={10}
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InputField
+                  label="Contact Email Address"
+                  id="company-email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  disabled={!isAdmin}
+                  placeholder="e.g. contact@acme.com"
+                  leftIcon={<Mail className="h-4 w-4" />}
+                />
+                
+                <InputField
+                  label="Contact Phone"
+                  id="company-phone"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  disabled={!isAdmin}
+                  placeholder="e.g. +91 99999 99999"
+                  leftIcon={<Phone className="h-4 w-4" />}
+                />
+              </div>
+
+              <InputField
+                label="Official Website"
+                id="company-website"
+                type="url"
+                value={formData.website}
+                onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                disabled={!isAdmin}
+                placeholder="e.g. https://acme.com"
+                leftIcon={<Globe className="h-4 w-4" />}
+              />
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-[#0F172A] dark:text-[#E2E8F0]">
+                  Registered Billing Address
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-3 text-[#94A3B8] dark:text-[#6B7280]">
+                    <MapPin className="h-4 w-4" />
+                  </span>
+                  <textarea
+                    id="company-address"
+                    rows={4}
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    disabled={!isAdmin}
+                    placeholder="Enter complete office address..."
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border bg-white text-sm text-[#0F172A] placeholder-[#94A3B8] transition-all duration-150 focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-[#111827] dark:text-[#E5E7EB] dark:placeholder-[#6B7280] border-[#E2E8F0] focus:border-[#2563EB] focus:ring-[#2563EB]/20 dark:border-[#1F2937] dark:focus:border-[#3B82F6] dark:focus:ring-[#3B82F6]/20"
+                  />
+                </div>
+              </div>
+
+              {isAdmin && (
+                <div className="flex justify-end pt-2">
+                  <Btn variant="primary" type="submit" leftIcon={<Save className="h-4 w-4" />} disabled={loading}>
+                    Save Company Profile
+                  </Btn>
+                </div>
+              )}
+            </form>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

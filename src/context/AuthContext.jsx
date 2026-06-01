@@ -13,6 +13,8 @@ const AuthContext = createContext({
   login: () => {},
   logout: () => {},
   isLoading: true,
+  refreshProfile: async () => {},
+  hasPermission: () => false,
 });
 
 // Helper: Decode token safely
@@ -36,9 +38,35 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+
+  // 🔄 Fetch / profile helper
+  const fetchProfile = async (tokenToCheck) => {
+    try {
+      const activeToken = tokenToCheck || accessToken || localStorage.getItem("auth_token");
+      if (!activeToken) return;
+
+      const res = await apiClient.get("/profile/");
+      if (res.data && res.data.data) {
+        const profile = res.data.data;
+        setUser((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            first_name: profile.first_name || "",
+            last_name: profile.last_name || "",
+            profile_image_url: profile.profile_image_url || null,
+            permissions: profile.permissions || prev.permissions || {},
+            role: profile.role || prev.role
+          };
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch user profile:", err);
+    }
+  };
   
   // 🔐 Login
-  const login = ({ access, refresh,user_id }) => {
+  const login = async ({ access, refresh, user_id }) => {
     localStorage.setItem("auth_token", access);
     localStorage.setItem("refresh_token", refresh);
 
@@ -47,7 +75,6 @@ export const AuthProvider = ({ children }) => {
       secure: process.env.NODE_ENV === "production", 
       sameSite: "Lax" 
     });
-
 
     const decoded = decodeToken(access);
     if (decoded) {
@@ -60,17 +87,40 @@ export const AuthProvider = ({ children }) => {
         token: decoded 
       });
       setIsAuthenticated(true);
+      
+      // Load user profile details immediately
+      await fetchProfile(access);
     }
   };
 
   // 🚪 Logout
   const logout = () => {
-     localStorage.clear();
-  Cookies.remove("auth_token");
-setAccessToken(null);
+    localStorage.clear();
+    Cookies.remove("auth_token");
+    setAccessToken(null);
     setUser(null);
     setIsAuthenticated(false);
     router.push("/login");
+  };
+
+  // 🔐 Permission helper
+  const hasPermission = (moduleName, action) => {
+    if (!user) return false;
+    if (user.role === "SUPER_ADMIN" || user.role === "COMPANY_ADMIN") {
+      return true;
+    }
+    const perms = user.permissions || {};
+    if (perms.all === true) {
+      return true;
+    }
+    const modulePerms = perms[moduleName];
+    if (modulePerms === true) {
+      return true;
+    }
+    if (modulePerms && typeof modulePerms === "object") {
+      return !!modulePerms[action];
+    }
+    return false;
   };
 
   // ⏱️ Auto-check token on mount
@@ -79,8 +129,6 @@ setAccessToken(null);
    
     const decoded = decodeToken(token);
   
-
-
     if (decoded) {
       const isExpired = decoded.exp * 1000 < Date.now();
       // If token is expired or missing the newly added 'role' field, force re-login
@@ -96,6 +144,9 @@ setAccessToken(null);
           token: decoded 
         });
         setIsAuthenticated(true);
+        
+        // Fetch full profile info on page load/mount
+        fetchProfile(token);
       }
     } else {
       setIsAuthenticated(false);
@@ -113,6 +164,8 @@ setAccessToken(null);
         login,
         logout,
         isLoading,
+        refreshProfile: fetchProfile,
+        hasPermission,
       }}
     >
       {children}

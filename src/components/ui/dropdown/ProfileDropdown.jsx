@@ -56,8 +56,9 @@ export default function ProfileDropdown({
     return () => document.removeEventListener("keydown", handleEsc);
   }, []);
 
-  const initials = user.name
+  const initials = (user.name || "User")
     .split(" ")
+    .filter(Boolean)
     .map((n) => n[0])
     .join("")
     .slice(0, 2)
@@ -159,13 +160,15 @@ export default function ProfileDropdown({
             <MenuItem href={`/${userId}`} icon={<LayoutDashboard className="h-4 w-4" />}>
               Dashboard
             </MenuItem>
-            <MenuItem href={`/${userId}/profile`} icon={<User className="h-4 w-4" />}>
-              My Profile
-            </MenuItem>
+            {user.role !== "Company Admin" && (
+              <MenuItem href={`/${userId}/profile`} icon={<User className="h-4 w-4" />}>
+                My Profile
+              </MenuItem>
+            )}
             <MenuItem href={`/${userId}/notifications`} icon={<Bell className="h-4 w-4" />}>
               Notifications
             </MenuItem>
-            <MenuItem href={`/${userId}/settings`} icon={<Settings className="h-4 w-4" />}>
+            <MenuItem href={`/${userId}/configurations`} icon={<Settings className="h-4 w-4" />}>
               Settings
             </MenuItem>
           </div>

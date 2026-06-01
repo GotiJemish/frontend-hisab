@@ -7,6 +7,7 @@ import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
 import { useAuth } from "@/context/AuthContext";
 import { useLoading } from "@/context/LoadingContext";
+import { useParams } from "next/navigation";
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
@@ -18,7 +19,9 @@ export default function UsersPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const toast = useToast();
-  const { user } = useAuth(); // Current logged-in user
+  const { user, hasPermission } = useAuth(); // Current logged-in user
+  const params = useParams();
+  const userId = params?.userId || "";
 
   // Form State
   const [formData, setFormData] = useState({
@@ -171,19 +174,30 @@ export default function UsersPage() {
       key: "name", 
       header: "Name",
       sortable: true,
-      render: (_, row) => (
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-200 uppercase font-bold text-xs">
-            {row.first_name?.[0]}{row.last_name?.[0]}
+      render: (_, row) => {
+        const initials = `${row.first_name?.[0] || ""}${row.last_name?.[0] || ""}`.toUpperCase();
+        return (
+          <div className="flex items-center gap-3">
+            {row.profile_image_url ? (
+              <img
+                src={row.profile_image_url}
+                alt={`${row.first_name} ${row.last_name}`}
+                className="h-8 w-8 rounded-full object-cover ring-1 ring-blue-500/20"
+              />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-200 uppercase font-bold text-xs">
+                {initials || "U"}
+              </div>
+            )}
+            <div className="flex flex-col">
+              <span className="font-medium text-gray-900 dark:text-gray-100">
+                {row.first_name} {row.last_name}
+              </span>
+              <span className="text-xs text-gray-500">{row.email}</span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="font-medium text-gray-900 dark:text-gray-100">
-              {row.first_name} {row.last_name}
-            </span>
-            <span className="text-xs text-gray-500">{row.email}</span>
-          </div>
-        </div>
-      )
+        );
+      }
     },
     { 
       key: "role", 
@@ -207,26 +221,47 @@ export default function UsersPage() {
         <div className="flex justify-center gap-1">
           {row.id !== user?.user_id && (
             <>
-              <button
-                onClick={() => handleOpenModal(row)}
-                className="rounded-lg p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-colors"
-                title="Edit User"
-              >
-                <Edit className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => handleDelete(row.id)}
-                className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors"
-                title="Remove User"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {hasPermission("users", "update") && (
+                <button
+                  onClick={() => handleOpenModal(row)}
+                  className="rounded-lg p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-colors"
+                  title="Edit User"
+                >
+                  <Edit className="h-4 w-4" />
+                </button>
+              )}
+              {hasPermission("users", "delete") && (
+                <button
+                  onClick={() => handleDelete(row.id)}
+                  className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors"
+                  title="Remove User"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </>
           )}
         </div>
       )
     }
   ];
+
+  if (user && !hasPermission("users", "read")) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-white dark:bg-[#0F172A] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm max-w-md mx-auto mt-12">
+        <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-full text-red-500 dark:text-red-400 mb-4 ring-8 ring-red-50/50 dark:ring-red-950/10">
+          <Shield className="h-10 w-10" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-6">
+          You do not have the required permissions to view or manage organization users. Please contact your administrator if you believe this is an error.
+        </p>
+        <Btn variant="primary" onClick={() => window.location.href = `/${userId}`}>
+          Back to Dashboard
+        </Btn>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -236,9 +271,11 @@ export default function UsersPage() {
           <p className="text-sm text-gray-500">Manage access and roles for your company members.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => handleOpenModal()}>
-            Add User
-          </Btn>
+          {hasPermission("users", "create") && (
+            <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => handleOpenModal()}>
+              Add User
+            </Btn>
+          )}
         </div>
       </div>
 

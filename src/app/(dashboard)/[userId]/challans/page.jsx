@@ -21,6 +21,7 @@ export default function ChallansPage() {
   const [contacts, setContacts] = useState([]);
   const [itemsList, setItemsList] = useState([]);
   const [taxesList, setTaxesList] = useState([]);
+  const [companyProfile, setCompanyProfile] = useState(null);
   
   // GST Selection Rates Local & Saved options
   const [gstOptions, setGstOptions] = useState(() => {
@@ -80,17 +81,19 @@ export default function ChallansPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [invRes, conRes, itmRes, taxRes] = await Promise.all([
+      const [invRes, conRes, itmRes, taxRes, compRes] = await Promise.all([
         apiClient.get("/invoices/"),
         apiClient.get("/contacts/"),
         apiClient.get("/items/"),
-        apiClient.get("/taxes/")
+        apiClient.get("/taxes/"),
+        apiClient.get("/company/").catch(() => ({ data: { success: false } }))
       ]);
       
       if (invRes.data.success) setInvoices(invRes.data.data || []);
       if (conRes.data.success) setContacts(conRes.data.data || []);
       if (itmRes.data.success) setItemsList(itmRes.data.data || []);
       if (taxRes.data.success) setTaxesList(taxRes.data.data || []);
+      if (compRes.data.success) setCompanyProfile(compRes.data.data);
     } catch (err) {
       toast.error("Failed to load data");
     } finally {
@@ -101,6 +104,17 @@ export default function ChallansPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Sync custom GST rates with taxes from configuration module
+  useEffect(() => {
+    if (taxesList && taxesList.length > 0) {
+      const options = taxesList.map(t => ({
+        value: parseFloat(t.rate),
+        label: `${t.name} (${parseFloat(t.rate)}%)`
+      }));
+      setGstOptions(options);
+    }
+  }, [taxesList]);
 
   // Auto-detect Intra vs Inter State based on contact billing state
   useEffect(() => {
@@ -927,8 +941,10 @@ export default function ChallansPage() {
                   <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-650 dark:text-blue-400 px-3.5 py-1.5 rounded-full text-xs font-black tracking-wider uppercase">
                     Delivery Challan
                   </span>
-                  <h2 className="text-3xl font-black text-slate-900 dark:text-white mt-4">HISAAB LLC</h2>
-                  <p className="text-xs text-slate-500 mt-1 font-semibold">GSTIN: 24AAACH1234F1Z0</p>
+                  <h2 className="text-3xl font-black text-slate-900 dark:text-white mt-4">{companyProfile?.name || "My Company"}</h2>
+                  {companyProfile?.gstin && <p className="text-xs text-slate-500 mt-1 font-semibold">GSTIN: {companyProfile.gstin}</p>}
+                  {companyProfile?.pan && <p className="text-xs text-slate-500 mt-0.5 font-semibold">PAN: {companyProfile.pan}</p>}
+                  {companyProfile?.address && <p className="text-xs text-slate-400 mt-1 max-w-xs">{companyProfile.address}</p>}
                 </div>
                 <div className="text-right space-y-1 text-sm font-medium">
                   <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Challan Details</p>

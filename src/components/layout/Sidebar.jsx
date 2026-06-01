@@ -27,9 +27,9 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
   const perms = user?.permissions || {};
 
   const NAV_ITEMS = [
-    { href: `/${userId}`,          label: "Dashboard",  icon: LayoutDashboard, show: true },
-    { href: `/${userId}/users`,           label: "Users",           icon: Users, show: isAdmin },
-    { href: `/${userId}/roles`,           label: "Roles",           icon: Shield, show: isAdmin },
+    { href: `/${userId}`,                 label: "Dashboard",  icon: LayoutDashboard, show: true },
+    { href: `/${userId}/users`,           label: "Users",           icon: Users, show: isAdmin || perms.users?.read || perms.users === true },
+    { href: `/${userId}/roles`,           label: "Roles",           icon: Shield, show: isAdmin || perms.roles?.read || perms.roles === true },
     { href: `/${userId}/configurations`,  label: "Configurations",  icon: Settings, show: isAdmin },
     { href: `/${userId}/items`,           label: "Products",        icon: ShoppingBag, show: isAdmin || perms.items === true || perms.items?.read },
     { href: `/${userId}/invoices`,        label: "Invoices",        icon: Inbox, show: isAdmin || perms.invoices === true || perms.invoices?.read },
@@ -58,11 +58,7 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
     >
       {/* ── Main nav ── */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden pt-4 pb-3 px-2 space-y-0.5">
-        {(!collapsed || mobileOpen) && (
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-[#94A3B8] dark:text-[#6B7280] transition-opacity duration-300">
-            Main Menu
-          </p>
-        )}
+       
         {NAV_ITEMS.filter(i => i.show).map((item) => (
           <NavItem
             key={item.href}
@@ -74,34 +70,7 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
       </nav>
 
       {/* ── Bottom nav ── */}
-      <div className="mt-auto border-t border-[#E2E8F0] dark:border-[#1F2937] py-3 px-2 space-y-0.5">
-        {BOTTOM_ITEMS.map((item) => (
-          <NavItem
-            key={item.href}
-            {...item}
-            active={pathname === item.href}
-            collapsed={collapsed && !mobileOpen}
-          />
-        ))}
-
-        {/* Sign out */}
-        <button
-          type="button"
-          onClick={logout}
-          className={`
-            group relative w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium
-            text-[#EF4444] hover:bg-[#FEF2F2] dark:text-[#F87171] dark:hover:bg-[#450A0A]/30
-            transition-colors focus:outline-none focus:ring-2 focus:ring-[#EF4444]/30
-            ${collapsed && !mobileOpen ? "justify-center" : ""}
-          `}
-        >
-          <LogOut className="h-5 w-5 shrink-0" aria-hidden="true" />
-          {(!collapsed || mobileOpen) && <span>Sign Out</span>}
-          {collapsed && !mobileOpen && (
-            <Tooltip label="Sign Out" />
-          )}
-        </button>
-      </div>
+    
     </aside>
   );
 }
