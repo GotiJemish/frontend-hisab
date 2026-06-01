@@ -231,4 +231,13 @@ export const customTheme = createTheme({
       },
     },
   },
+  toast: {
+    root: {
+      base: "flex items-start w-full max-w-xs  p-px-3 py-2 rounded-2xl shadow-xl bg-white border border-gray-100 dark:bg-[#1E293B] dark:border-[#334155]/40 transition-all duration-300",
+    },
+    toggle: {
+      base: "flex-shrink-0 -mx-1.5 -my-1.5 p-1.5 rounded-xl outline-none text-gray-400 hover:text-gray-700 hover:bg-gray-50 dark:text-gray-500 dark:hover:text-white dark:hover:bg-slate-800/80 transition-colors focus:ring-2 focus:ring-blue-500/20",
+      icon: "h-4 w-4",
+    },
+  },
 });

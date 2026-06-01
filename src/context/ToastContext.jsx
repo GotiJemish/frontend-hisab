@@ -73,11 +73,11 @@ export const ToastProvider = ({ children }) => {
       <ToastContext.Provider value={{ showToast }}>
         {children}
 
-        <div className="fixed top-5 right-5 z-50 flex flex-col gap-3 items-end">
+        <div className="fixed top-5 right-5 z-50 flex flex-col gap-3 items-end w-full max-w-[calc(100vw-40px)] sm:max-w-md">
           {toasts.map((toast) => (
             <div
               key={toast.id}
-              className={`transition-opacity duration-300 ${
+              className={`transition-opacity duration-300 w-full flex justify-end ${
                 toast.isRemoving ? "opacity-0" : "animate-toast-in"
               }`}
             >
@@ -98,16 +98,16 @@ export const ToastProvider = ({ children }) => {
           @keyframes toast-in {
             0% {
               opacity: 0;
-              transform: translateY(20px);
+              transform: translateX(50px);
             }
             100% {
               opacity: 1;
-              transform: translateY(0);
+              transform: translateX(0);
             }
           }
 
           .animate-toast-in {
-            animation: toast-in 0.3s ease-out forwards;
+            animation: toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           }
         `}</style>
       </ToastContext.Provider>
