@@ -1,22 +1,41 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, RefreshCw, Trash2, Edit, Wallet, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Filter } from "lucide-react";
+import { Plus, Search, RefreshCw, Trash2, Edit, Wallet, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Filter, MoreVertical, ChevronRight, Coins } from "lucide-react";
 import { Btn, Card, InputField, Table, Select } from "@/components/ui";
 import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
 import { useLoading } from "@/context/LoadingContext";
 
+import { useRouter, useParams } from "next/navigation";
 import AccountFormModal from "./components/AccountFormModal";
 import IncomeFormModal from "./components/IncomeFormModal";
 import ExpenseFormModal from "./components/ExpenseFormModal";
 
 export default function AccountsPage() {
+  const router = useRouter();
+  const params = useParams();
   const [accounts, setAccounts] = useState([]);
   const [incomes, setIncomes] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [activeDropdownId, setActiveDropdownId] = useState(null);
   const { loading, setLoading } = useLoading();
+
+  useEffect(() => {
+    const handleOutsideClick = () => setActiveDropdownId(null);
+    window.addEventListener("click", handleOutsideClick);
+    return () => window.removeEventListener("click", handleOutsideClick);
+  }, []);
+
+  const getInitials = (name) => {
+    if (!name) return "";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
   
   // Search & Filter state
   const [search, setSearch] = useState("");
@@ -167,6 +186,23 @@ export default function AccountsPage() {
     }
   };
 
+  const handleAccountToggleActive = async (acc) => {
+    setLoading(true);
+    try {
+      const res = await apiClient.patch(`/accounts/${acc.id}/`, {
+        is_active: !acc.is_active,
+      });
+      if (res.data.success) {
+        toast.success(res.data.message || `Account ${acc.is_active ? "deactivated" : "activated"} successfully.`);
+        fetchData();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update account status");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ---------------------------------
   // TRANSACTION SUBMITS
   // ---------------------------------
@@ -288,53 +324,6 @@ export default function AccountsPage() {
   // Get distinct categories
   const allCategories = Array.from(new Set(transactions.map(t => t.category)));
 
-  // Account Columns
-  const accountColumns = [
-    {
-      key: "name",
-      header: "Account Name",
-      render: (_, row) => (
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-100 text-cyan-600 dark:bg-cyan-900/40 dark:text-cyan-400">
-            <Wallet className="h-4 w-4" />
-          </div>
-          <span className="font-semibold text-gray-900 dark:text-gray-100">{row.name}</span>
-        </div>
-      )
-    },
-    {
-      key: "balance",
-      header: "Current Balance",
-      render: (_, row) => (
-        <span className={`font-semibold ${parseFloat(row.balance) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
-          {formatCurrency(row.balance)}
-        </span>
-      )
-    },
-    {
-      key: "actions",
-      header: "Actions",
-      align: "center",
-      render: (_, row) => (
-        <div className="flex justify-center gap-1">
-          <button
-            onClick={() => handleOpenAccountModal(row)}
-            className="rounded-lg p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-colors"
-            title="Edit Account"
-          >
-            <Edit className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => handleAccountDelete(row.id)}
-            className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors"
-            title="Delete Account"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      )
-    }
-  ];
 
   // Transaction Ledger Columns
   const ledgerColumns = [
@@ -489,28 +478,138 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      {/* ── ACCOUNTS LIST & DETAILS ── */}
-      <Card
-        header={
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900 dark:text-white">Active Accounts</h2>
-            <Btn variant="ghost" size="sm" onClick={fetchData}>
-              <RefreshCw className={`h-4 w-4 ${loading && accounts.length === 0 ? "animate-spin" : ""}`} />
-            </Btn>
-          </div>
-        }
-      >
-        <div className="-mx-5 -mb-5">
-          <Table
-            columns={accountColumns}
-            data={accounts}
-            loading={loading && accounts.length === 0}
-            emptyMessage="No accounts created yet. Click 'Add Account' to set one up!"
-            pagination={false}
-            striped={true}
-          />
+      {/* ── ACCOUNTS LIST & DETAILS (Card Grid View) ── */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Company Accounts</h2>
+          <Btn variant="ghost" size="sm" onClick={fetchData} className="p-2">
+            <RefreshCw className={`h-4 w-4 ${loading && accounts.length === 0 ? "animate-spin" : ""}`} />
+          </Btn>
         </div>
-      </Card>
+
+        {accounts.length === 0 && !loading ? (
+          <Card className="p-8 text-center flex flex-col items-center justify-center border border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
+            <Wallet className="h-10 w-10 text-slate-400 dark:text-slate-600 mb-3 opacity-60" />
+            <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">No accounts created yet.</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Click "Add Account" to set one up!</p>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {accounts.map((acc) => {
+              const balanceNum = parseFloat(acc.balance || 0);
+              return (
+                <div
+                  key={acc.id}
+                  onClick={() => router.push(`/${params.userId}/accounts/${acc.id}`)}
+                  className={`group relative bg-white dark:bg-[#111827] border border-[#E2E8F0] dark:border-[#1F2937] hover:border-blue-500 dark:hover:border-blue-500 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between overflow-visible cursor-pointer ${
+                    !acc.is_active ? "opacity-75 bg-slate-50/50 dark:bg-slate-900/30" : ""
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      {/* Avatar initials badge */}
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 font-bold text-base select-none flex-shrink-0">
+                        {getInitials(acc.name)}
+                      </div>
+                      <div>
+                        {/* Account Name */}
+                        <h3 className="font-semibold text-slate-900 dark:text-white text-base tracking-tight leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          {acc.name}
+                        </h3>
+                        {/* Subtitle balance info */}
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          <Wallet className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                          <span className={`font-semibold ${balanceNum >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                            {formatCurrency(balanceNum)}
+                          </span>
+                          {!acc.is_active && (
+                            <span className="ml-1 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500 bg-slate-100 dark:text-slate-400 dark:bg-slate-800 rounded">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions Menu */}
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveDropdownId(activeDropdownId === acc.id ? null : acc.id);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors"
+                      >
+                        <MoreVertical className="h-5 w-5" />
+                      </button>
+                      {activeDropdownId === acc.id && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 mt-1 w-36 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg py-1.5 z-20"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveDropdownId(null);
+                              handleOpenAccountModal(acc);
+                            }}
+                            className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 flex items-center gap-2"
+                          >
+                            <Edit className="h-3.5 w-3.5 text-blue-500" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveDropdownId(null);
+                              handleAccountToggleActive(acc);
+                            }}
+                            className={`w-full text-left px-4 py-2 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-slate-800/60 flex items-center gap-2 ${
+                              acc.is_active ? "text-amber-600" : "text-emerald-600"
+                            }`}
+                          >
+                            {acc.is_active ? "Deactivate" : "Activate"}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveDropdownId(null);
+                              handleAccountDelete(acc.id);
+                            }}
+                            className="w-full text-left px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-slate-50 dark:hover:bg-slate-800/60 flex items-center gap-2"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <hr className="border-slate-100 dark:border-slate-800/80 my-4" />
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                      <Coins className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                      <span>Initial: <span className="font-semibold text-slate-700 dark:text-slate-350">{formatCurrency(parseFloat(acc.initial_balance || 0))}</span></span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/${params.userId}/accounts/${acc.id}`);
+                      }}
+                      className="flex items-center gap-0.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      <span>See details</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* ── TRANSACTION LEDGER ── */}
       <Card

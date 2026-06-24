@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, RefreshCw, Trash2, Eye, Printer } from "lucide-react";
+import { Plus, Search, RefreshCw, Trash2, Eye, Printer, Edit, Shield } from "lucide-react";
 import { Btn, Card, InputField, Table, Modal } from "@/components/ui";
 import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
+import { useAuth } from "@/context/AuthContext";
 import { useLoading } from "@/context/LoadingContext";
 import AppSelect from "@/components/ui/AppSelect";
 import ItemFormModal from "../items/components/ItemFormModal";
@@ -16,6 +17,9 @@ export default function InvoicesPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState(null);
+  const { user, hasPermission } = useAuth();
+  const [editingInvoiceId, setEditingInvoiceId] = useState(null);
+
   
   // Lookups
   const [contacts, setContacts] = useState([]);
@@ -23,26 +27,8 @@ export default function InvoicesPage() {
   const [taxesList, setTaxesList] = useState([]);
   const [companyProfile, setCompanyProfile] = useState(null);
   
-  // GST Selection Rates Local & Saved options
-  const [gstOptions, setGstOptions] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("hisaab_custom_gst_rates");
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    }
-    return [
-      { value: 0, label: "0%" },
-      { value: 5, label: "5%" },
-      { value: 12, label: "12%" },
-      { value: 18, label: "18%" },
-      { value: 28, label: "28%" },
-    ];
-  });
+  // GST Selection Rates from Configuration module
+  const [gstOptions, setGstOptions] = useState([]);
 
   // GST Treatment State: intra (CGST + SGST) vs inter (IGST)
   const [gstType, setGstType] = useState("intra");
@@ -62,9 +48,29 @@ export default function InvoicesPage() {
     sac: "",
   });
 
+  // New Contact Modal State
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [contactFormData, setContactFormData] = useState({
+    name: "",
+    mobile: "",
+    email: "",
+    billing_address: "",
+    billing_city: "",
+    billing_state: "Gujarat",
+    billing_pincode: "",
+    billing_country: "India",
+    same_as_billing: true,
+    shipping_address: "",
+    shipping_city: "",
+    shipping_state: "Gujarat",
+    shipping_pincode: "",
+    shipping_country: "India",
+  });
+
   const toast = useToast();
 
   const [formData, setFormData] = useState({
+    bill_id: "",
     invoice_number: "",
     invoice_date: new Date().toISOString().split("T")[0],
     contact: "",
@@ -105,9 +111,9 @@ export default function InvoicesPage() {
     fetchData();
   }, []);
 
-  // Sync custom GST rates with taxes from configuration module
+  // Sync GST rates with taxes from configuration module
   useEffect(() => {
-    if (taxesList && taxesList.length > 0) {
+    if (taxesList) {
       const options = taxesList.map(t => ({
         value: parseFloat(t.rate),
         label: `${t.name} (${parseFloat(t.rate)}%)`
@@ -128,8 +134,46 @@ export default function InvoicesPage() {
     }
   }, [formData.contact, contacts]);
 
+  // Fetch next invoice number and bill ID when date changes or modal opens
+  useEffect(() => {
+    if (!modalOpen || editingInvoiceId) return; // Only fetch during creation
+    
+    const fetchNextIds = async () => {
+      try {
+        const res = await apiClient.get(`/invoices/invoice-number/?date=${formData.invoice_date}`);
+        if (res.data.success) {
+          setFormData(prev => ({
+            ...prev,
+            invoice_number: res.data.data.next_invoice_number || "",
+            bill_id: res.data.data.next_bill_id || ""
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to fetch next invoice ID:", err);
+      }
+    };
+    
+    fetchNextIds();
+  }, [formData.invoice_date, modalOpen, editingInvoiceId]);
+
+  const handleSkipInvoiceId = () => {
+    if (!formData.invoice_number) return;
+    
+    const last4 = formData.invoice_number.slice(-4);
+    const prefix = formData.invoice_number.slice(0, -4);
+    if (/^\d{4}$/.test(last4)) {
+      const nextNum = parseInt(last4, 10) + 1;
+      const paddedNum = String(nextNum).padStart(4, '0');
+      setFormData(prev => ({
+        ...prev,
+        invoice_number: `${prefix}${paddedNum}`
+      }));
+    }
+  };
+
   const handleOpenModal = () => {
     setFormData({
+      bill_id: "",
       invoice_number: "",
       invoice_date: new Date().toISOString().split("T")[0],
       contact: "",
@@ -143,6 +187,53 @@ export default function InvoicesPage() {
       ],
     });
     setGstType("intra");
+    setEditingInvoiceId(null);
+    setModalOpen(true);
+  };
+
+  const handleEditModal = (inv) => {
+    let note = inv.internal_note || "";
+    let extractedGstType = "intra";
+    
+    if (note.startsWith("[GST_TYPE:inter]")) {
+      extractedGstType = "inter";
+      note = note.replace("[GST_TYPE:inter]", "").trim();
+    } else if (note.startsWith("[GST_TYPE:intra]")) {
+      extractedGstType = "intra";
+      note = note.replace("[GST_TYPE:intra]", "").trim();
+    } else {
+      // Auto-detect based on contact's billing state
+      const selectedContact = contacts.find(c => c.id == inv.contact);
+      if (selectedContact && selectedContact.billing_state) {
+        const isLocal = selectedContact.billing_state.toLowerCase().trim() === "gujarat";
+        extractedGstType = isLocal ? "intra" : "inter";
+      }
+    }
+
+    setFormData({
+      bill_id: inv.bill_id || "",
+      invoice_number: inv.invoice_number || "",
+      invoice_date: inv.invoice_date || new Date().toISOString().split("T")[0],
+      contact: inv.contact || "",
+      invoice_type: inv.invoice_type || "old_dc",
+      supply_type: inv.supply_type || "regular",
+      party_challan_no: inv.party_challan_no || "",
+      internal_note: note,
+      notes: inv.notes || "",
+      items: inv.items ? inv.items.map(item => ({
+        item_id: item.item_id || "",
+        description: item.description || "",
+        quantity: item.quantity || 1,
+        rate: item.rate || 0,
+        gst_percentage: item.gst_percentage || 5,
+        delivery_challan_no: item.delivery_challan_no || ""
+      })) : [
+        { item_id: "", description: "", quantity: 1, rate: 0, gst_percentage: 5, delivery_challan_no: "" }
+      ],
+    });
+    
+    setGstType(extractedGstType);
+    setEditingInvoiceId(inv.id);
     setModalOpen(true);
   };
 
@@ -216,29 +307,7 @@ export default function InvoicesPage() {
     setFormData({ ...formData, items: newItems });
   };
 
-  // Create a new GST Rate Option dynamically and save it in state & localStorage
-  const handleCreateGstOption = (inputValue, index) => {
-    const numericVal = parseFloat(inputValue.replace(/[^0-9.]/g, ""));
-    if (isNaN(numericVal)) {
-      toast.error("Please enter a valid number for GST percentage");
-      return;
-    }
-    const label = `${numericVal}%`;
-    const newOpt = { value: numericVal, label };
 
-    if (gstOptions.some(o => o.value === numericVal)) {
-      handleItemChange(index, "gst_percentage", numericVal);
-      return;
-    }
-
-    const updatedOptions = [...gstOptions, newOpt].sort((a, b) => a.value - b.value);
-    setGstOptions(updatedOptions);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("hisaab_custom_gst_rates", JSON.stringify(updatedOptions));
-    }
-    handleItemChange(index, "gst_percentage", numericVal);
-    toast.success(`Custom GST rate ${label} created and saved`);
-  };
 
   const handleItemSubmit = async (e) => {
     e.preventDefault();
@@ -275,6 +344,46 @@ export default function InvoicesPage() {
       }
     } catch (err) {
       toast.error("Failed to save item");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContactSubmit = async (e) => {
+    e.preventDefault();
+    if (!contactFormData.name) return toast.error("Contact name is required");
+    
+    setLoading(true);
+    try {
+      const payload = {
+        ...contactFormData,
+        shipping_address: contactFormData.same_as_billing ? contactFormData.billing_address : contactFormData.shipping_address,
+        shipping_city: contactFormData.same_as_billing ? contactFormData.billing_city : contactFormData.shipping_city,
+        shipping_state: contactFormData.same_as_billing ? contactFormData.billing_state : contactFormData.shipping_state,
+        shipping_pincode: contactFormData.same_as_billing ? contactFormData.billing_pincode : contactFormData.shipping_pincode,
+        shipping_country: contactFormData.same_as_billing ? contactFormData.billing_country : contactFormData.shipping_country,
+      };
+
+      const res = await apiClient.post("/contacts/", payload);
+      if (res.data.success) {
+        toast.success("Contact created successfully.");
+        
+        // Refresh contacts list
+        const conRes = await apiClient.get("/contacts/");
+        if (conRes.data.success) {
+          const updatedContacts = conRes.data.data || [];
+          setContacts(updatedContacts);
+          
+          // Auto-select the newly created contact
+          const newContact = res.data.data || updatedContacts.find(c => c.name === contactFormData.name);
+          if (newContact) {
+            setFormData(prev => ({ ...prev, contact: newContact.id }));
+          }
+        }
+        setContactModalOpen(false);
+      }
+    } catch (err) {
+      toast.error("Failed to create contact");
     } finally {
       setLoading(false);
     }
@@ -354,10 +463,17 @@ export default function InvoicesPage() {
         }))
       };
 
-      const { data } = await apiClient.post("/invoices/", payload);
-      if (data.success) {
-        toast.success("Invoice created successfully");
+      let response;
+      if (editingInvoiceId) {
+        response = await apiClient.put(`/invoices/${editingInvoiceId}/`, payload);
+      } else {
+        response = await apiClient.post("/invoices/", payload);
+      }
+
+      if (response.data.success) {
+        toast.success(editingInvoiceId ? "Invoice updated successfully" : "Invoice created successfully");
         setModalOpen(false);
+        setEditingInvoiceId(null);
         fetchData();
       }
     } catch (err) {
@@ -365,7 +481,7 @@ export default function InvoicesPage() {
         const errorMsg = typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data);
         toast.error(`Error: ${errorMsg}`);
       } else {
-        toast.error("Failed to create invoice");
+        toast.error(editingInvoiceId ? "Failed to update invoice" : "Failed to create invoice");
       }
     } finally {
       setLoading(false);
@@ -558,13 +674,37 @@ export default function InvoicesPage() {
           <button onClick={() => handleViewModal(row)} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-all" title="View & Print Details">
             <Eye className="h-4 w-4" />
           </button>
-          <button onClick={() => handleDelete(row.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-lg transition-all" title="Delete Invoice">
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {hasPermission("invoices", "update") && (
+            <button onClick={() => handleEditModal(row)} className="p-1.5 text-amber-500 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition-all" title="Edit Invoice">
+              <Edit className="h-4 w-4" />
+            </button>
+          )}
+          {hasPermission("invoices", "delete") && (
+            <button onClick={() => handleDelete(row.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-lg transition-all" title="Delete Invoice">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       )
     }
   ];
+
+  if (user && !hasPermission("invoices", "read")) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-white dark:bg-[#0F172A] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm max-w-md mx-auto mt-12">
+        <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-full text-red-500 dark:text-red-400 mb-4 ring-8 ring-red-50/50 dark:ring-red-950/10">
+          <Shield className="h-10 w-10" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-6">
+          You do not have the required permissions to view or manage organization invoices. Please contact your administrator if you believe this is an error.
+        </p>
+        <Btn variant="primary" onClick={() => window.location.href = `/${user?.user_id || ""}`}>
+          Back to Dashboard
+        </Btn>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -582,9 +722,11 @@ export default function InvoicesPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Invoices</h1>
           <p className="text-sm text-gray-500">Manage and preview OLD DC Invoices</p>
         </div>
-        <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={handleOpenModal}>
-          Create Invoice
-        </Btn>
+        {hasPermission("invoices", "create") && (
+          <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={handleOpenModal}>
+            Create Invoice
+          </Btn>
+        )}
       </div>
 
       <Card
@@ -618,7 +760,7 @@ export default function InvoicesPage() {
       </Card>
 
       {/* Create Invoice Modal (Sticky Two-Column Layout) */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Create New Invoice" size="5xl">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingInvoiceId ? "Edit Invoice" : "Create New Invoice"} size="5xl">
         <form onSubmit={handleSubmit} className="space-y-6 pt-2 pb-16">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             
@@ -629,17 +771,65 @@ export default function InvoicesPage() {
                 <h3 className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">Invoice Header</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <InputField
+                    label="Bill ID"
+                    value={formData.bill_id || ""}
+                    disabled
+                    placeholder={editingInvoiceId ? "Bill ID" : "Auto-generating Bill ID..."}
+                  />
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-gray-300 mb-1.5">
+                      Invoice ID <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        required
+                        value={formData.invoice_number}
+                        onChange={(e) => setFormData({...formData, invoice_number: e.target.value})}
+                        className="flex-1 w-full rounded-lg border border-[#E2E8F0] focus:border-[#2563EB] focus:ring-[#2563EB]/20 bg-white text-sm text-[#0F172A] placeholder-[#94A3B8] transition-all duration-150 focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-[#111827] dark:text-[#E5E7EB] dark:placeholder-[#6B7280] dark:border-[#1F2937] dark:focus:border-[#3B82F6] dark:focus:ring-[#3B82F6]/20 px-4 py-2"
+                        placeholder="Auto-generating Invoice ID..."
+                      />
+                      <Btn
+                        variant="outline"
+                        type="button"
+                        onClick={handleSkipInvoiceId}
+                        className="rounded-xl border-slate-300 dark:border-slate-700 flex items-center justify-center shrink-0 h-[38px] px-4 font-bold"
+                      >
+                        Skip
+                      </Btn>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 dark:text-gray-300 mb-1">Bill To (Contact) <span className="text-rose-500">*</span></label>
-                    <select
-                      required
-                      value={formData.contact}
-                      onChange={(e) => setFormData({...formData, contact: e.target.value})}
-                      className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-[#1E293B] focus:ring-2 focus:ring-blue-500/20 text-sm font-medium"
-                    >
-                      <option value="">Select Contact</option>
-                      {contacts.map(c => <option key={c.id} value={c.id}>{c.name} {c.mobile ? `(${c.mobile})` : ""}</option>)}
-                    </select>
+                    <AppSelect
+                      options={contacts.map(c => ({ value: c.id, label: `${c.name} ${c.mobile ? `(${c.mobile})` : ""}` }))}
+                      value={contacts.find(c => c.id == formData.contact) ? { value: formData.contact, label: `${contacts.find(c => c.id == formData.contact).name} ${contacts.find(c => c.id == formData.contact).mobile ? `(${contacts.find(c => c.id == formData.contact).mobile})` : ""}` } : null}
+                      onChange={(selected) => setFormData({...formData, contact: selected?.value || ""})}
+                      onCreateOption={(inputValue) => {
+                        setContactFormData({
+                          name: inputValue,
+                          mobile: "",
+                          email: "",
+                          billing_address: "",
+                          billing_city: "",
+                          billing_state: "Gujarat",
+                          billing_pincode: "",
+                          billing_country: "India",
+                          same_as_billing: true,
+                          shipping_address: "",
+                          shipping_city: "",
+                          shipping_state: "Gujarat",
+                          shipping_pincode: "",
+                          shipping_country: "India",
+                        });
+                        setContactModalOpen(true);
+                      }}
+                      placeholder="Search or Select Contact"
+                    />
                   </div>
                   
                   <InputField
@@ -769,7 +959,6 @@ export default function InvoicesPage() {
                                     handleItemChange(index, "gst_percentage", selected.value);
                                   }
                                 }}
-                                onCreateOption={(inputValue) => handleCreateGstOption(inputValue, index)}
                                 placeholder="GST Rate"
                               />
                             </td>
@@ -882,7 +1071,7 @@ export default function InvoicesPage() {
                 {/* Submit Actions */}
                 <div className="pt-5 space-y-2">
                   <Btn variant="primary" type="submit" className="w-full justify-center bg-blue-600 hover:bg-blue-700 py-3 shadow-lg shadow-blue-500/20 rounded-xl" disabled={loading}>
-                    {loading ? "Saving..." : "Create Invoice"}
+                    {loading ? "Saving..." : editingInvoiceId ? "Save Changes" : "Create Invoice"}
                   </Btn>
                   <Btn variant="outline" onClick={() => setModalOpen(false)} type="button" className="w-full justify-center rounded-xl border-slate-300 dark:border-slate-700">
                     Cancel
@@ -902,7 +1091,7 @@ export default function InvoicesPage() {
           </div>
           <div className="flex gap-2">
             <Btn variant="primary" size="sm" type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700">
-              {loading ? "Saving..." : "Create"}
+              {loading ? "Saving..." : editingInvoiceId ? "Save" : "Create"}
             </Btn>
           </div>
         </div>
@@ -1123,6 +1312,89 @@ export default function InvoicesPage() {
         handleSubmit={handleItemSubmit}
         loading={loading}
       />
+
+      {/* Add Contact Modal */}
+      <Modal open={contactModalOpen} onClose={() => setContactModalOpen(false)} title="Add Contact" size="2xl">
+        <form onSubmit={handleContactSubmit} className="space-y-4 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <InputField
+              label="Contact Name"
+              value={contactFormData.name}
+              onChange={(e) => setContactFormData({...contactFormData, name: e.target.value})}
+              required
+              placeholder="Full Name or Company"
+            />
+            <InputField
+              label="Mobile Number"
+              value={contactFormData.mobile}
+              onChange={(e) => setContactFormData({...contactFormData, mobile: e.target.value})}
+              placeholder="+919876543210"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <InputField
+              label="Email Address"
+              type="email"
+              value={contactFormData.email}
+              onChange={(e) => setContactFormData({...contactFormData, email: e.target.value})}
+              placeholder="example@domain.com"
+            />
+            <InputField
+              label="GST Number (Optional)"
+              value={contactFormData.gst}
+              onChange={(e) => setContactFormData({...contactFormData, gst: e.target.value.toUpperCase()})}
+              placeholder="15-char GSTIN"
+            />
+          </div>
+          
+          <div className="border-t border-slate-200 dark:border-slate-800 pt-3 space-y-3">
+            <h4 className="font-semibold text-xs uppercase tracking-wider text-slate-400">Billing Address</h4>
+            <InputField
+              label="Address Line"
+              value={contactFormData.billing_address}
+              onChange={(e) => setContactFormData({...contactFormData, billing_address: e.target.value})}
+              placeholder="123 Street Name"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <InputField
+                label="City"
+                value={contactFormData.billing_city}
+                onChange={(e) => setContactFormData({...contactFormData, billing_city: e.target.value})}
+                placeholder="City"
+              />
+              <InputField
+                label="State"
+                value={contactFormData.billing_state}
+                onChange={(e) => setContactFormData({...contactFormData, billing_state: e.target.value})}
+                placeholder="State"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <InputField
+                label="Pincode"
+                value={contactFormData.billing_pincode}
+                onChange={(e) => setContactFormData({...contactFormData, billing_pincode: e.target.value})}
+                placeholder="Pincode"
+              />
+              <InputField
+                label="Country"
+                value={contactFormData.billing_country}
+                onChange={(e) => setContactFormData({...contactFormData, billing_country: e.target.value})}
+                placeholder="Country"
+              />
+            </div>
+          </div>
+
+          <div className="pt-4 flex justify-end gap-2 border-t border-slate-200 dark:border-slate-800">
+            <Btn variant="outline" type="button" onClick={() => setContactModalOpen(false)}>
+              Cancel
+            </Btn>
+            <Btn variant="primary" type="submit" disabled={loading}>
+              {loading ? "Creating..." : "Save Contact"}
+            </Btn>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

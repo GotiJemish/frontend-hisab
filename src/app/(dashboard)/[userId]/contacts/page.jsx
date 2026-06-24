@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, RefreshCw, Trash2, Edit, Eye, Phone, Mail, MapPin, Building, FileText, Calendar, User } from "lucide-react";
+import { Plus, Search, RefreshCw, Trash2, Edit, Eye, Phone, Mail, MapPin, Building, FileText, Calendar, User, Shield } from "lucide-react";
 import { Btn, Card, InputField, Table, Modal } from "@/components/ui";
 import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
+import { useAuth } from "@/context/AuthContext";
 import { useLoading } from "@/context/LoadingContext";
 
 export default function ContactsPage() {
@@ -15,6 +16,7 @@ export default function ContactsPage() {
   const [editingContact, setEditingContact] = useState(null);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingContact, setViewingContact] = useState(null);
+  const { user, hasPermission } = useAuth();
   const toast = useToast();
 
   const [formData, setFormData] = useState({
@@ -177,16 +179,37 @@ export default function ContactsPage() {
           <button onClick={() => handleViewModal(row)} className="p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg" title="View Details">
             <Eye className="h-4 w-4" />
           </button>
-          <button onClick={() => handleOpenModal(row)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Edit">
-            <Edit className="h-4 w-4" />
-          </button>
-          <button onClick={() => handleDelete(row.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {hasPermission("contacts", "update") && (
+            <button onClick={() => handleOpenModal(row)} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg" title="Edit">
+              <Edit className="h-4 w-4" />
+            </button>
+          )}
+          {hasPermission("contacts", "delete") && (
+            <button onClick={() => handleDelete(row.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-lg">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       )
     }
   ];
+
+  if (user && !hasPermission("contacts", "read")) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-white dark:bg-[#0F172A] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm max-w-md mx-auto mt-12">
+        <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-full text-red-500 dark:text-red-400 mb-4 ring-8 ring-red-50/50 dark:ring-red-950/10">
+          <Shield className="h-10 w-10" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-6">
+          You do not have the required permissions to view or manage organization contacts. Please contact your administrator if you believe this is an error.
+        </p>
+        <Btn variant="primary" onClick={() => window.location.href = `/${user?.user_id || ""}`}>
+          Back to Dashboard
+        </Btn>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -195,9 +218,11 @@ export default function ContactsPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Contacts Management</h1>
           <p className="text-sm text-gray-500">Manage your customers and vendors</p>
         </div>
-        <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => handleOpenModal()}>
-          Add Contact
-        </Btn>
+        {hasPermission("contacts", "create") && (
+          <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => handleOpenModal()}>
+            Add Contact
+          </Btn>
+        )}
       </div>
 
       <Card

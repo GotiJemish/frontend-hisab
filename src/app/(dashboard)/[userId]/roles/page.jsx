@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, RefreshCw, Trash2, Edit } from "lucide-react";
+import { Plus, Search, RefreshCw, Trash2, Edit, Shield } from "lucide-react";
 import { Btn, Card, InputField, Table, Modal, PermissionMatrix } from "@/components/ui";
 import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
+import { useAuth } from "@/context/AuthContext";
 import { useLoading } from "@/context/LoadingContext";
 
 export default function RolesPage() {
@@ -13,6 +14,7 @@ export default function RolesPage() {
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
+  const { user, hasPermission } = useAuth();
   const toast = useToast();
 
   const [formData, setFormData] = useState({ name: "" });
@@ -99,16 +101,37 @@ export default function RolesPage() {
       key: "actions", header: "Actions", align: "center",
       render: (_, row) => (
         <div className="flex justify-center gap-2">
-          <button onClick={() => handleOpenModal(row)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg">
-            <Edit className="h-4 w-4" />
-          </button>
-          <button onClick={() => handleDelete(row.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {hasPermission("roles", "update") && (
+            <button onClick={() => handleOpenModal(row)} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg">
+              <Edit className="h-4 w-4" />
+            </button>
+          )}
+          {hasPermission("roles", "delete") && (
+            <button onClick={() => handleDelete(row.id)} className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-lg">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       )
     }
   ];
+
+  if (user && !hasPermission("roles", "read")) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-white dark:bg-[#0F172A] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm max-w-md mx-auto mt-12">
+        <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-full text-red-500 dark:text-red-400 mb-4 ring-8 ring-red-50/50 dark:ring-red-950/10">
+          <Shield className="h-10 w-10" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-6">
+          You do not have the required permissions to view or manage organization roles. Please contact your administrator if you believe this is an error.
+        </p>
+        <Btn variant="primary" onClick={() => window.location.href = `/${user?.user_id || ""}`}>
+          Back to Dashboard
+        </Btn>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -117,9 +140,11 @@ export default function RolesPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Role Management</h1>
           <p className="text-sm text-gray-500">Manage standard permissions across organizational roles</p>
         </div>
-        <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => handleOpenModal()}>
-          Create Role
-        </Btn>
+        {hasPermission("roles", "create") && (
+          <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => handleOpenModal()}>
+            Create Role
+          </Btn>
+        )}
       </div>
 
       <Card

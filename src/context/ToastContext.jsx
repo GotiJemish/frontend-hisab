@@ -24,12 +24,20 @@ export const ToastProvider = ({ children }) => {
   const [toasts, setToasts] = useState([]);
 
   const showToast = useCallback(
-    ({ message, type = "info", duration = 3000 }) => {
+    ({ message, type = "info", duration = 3000, ...rest }) => {
       const id = generateId();
 
-      const newToast = { id, message, type, isRemoving: false };
+      const newToast = { id, message, type, isRemoving: false, ...rest };
 
       setToasts((prev) => {
+        // Prevent duplicate active toasts with the same message and type
+        const isDuplicate = prev.some(
+          (t) => t.message === message && t.type === type && !t.isRemoving
+        );
+        if (isDuplicate) {
+          return prev;
+        }
+
         if (prev.length < MAX_VISIBLE_TOASTS) {
           return [...prev, newToast];
         } else {
@@ -85,9 +93,9 @@ export const ToastProvider = ({ children }) => {
                 variant={toast.type}
                 message={toast.message}
                 title={toast.title}
-                showLink={toast.hasLink}
+                showLink={toast.showLink ?? toast.hasLink}
                 linkHref={toast.linkHref}
-                linkText={toast.link}
+                linkText={toast.linkText ?? toast.link}
                 closeToast={() => closeToast(toast.id)}
               />
             </div>
@@ -128,8 +136,15 @@ export const useToast = () => {
     return Object.assign(toastFn, {
       success: (message, options) => showToast({ message, type: "success", ...options }),
       error: (message, options) => showToast({ message, type: "error", ...options }),
+      danger: (message, options) => showToast({ message, type: "error", ...options }),
       warning: (message, options) => showToast({ message, type: "warning", ...options }),
       info: (message, options) => showToast({ message, type: "info", ...options }),
+      loading: (message, options) => showToast({ message, type: "loading", ...options }),
+      promise: (message, options) => showToast({ message, type: "promise", ...options }),
+      pending: (message, options) => showToast({ message, type: "pending", ...options }),
+      default: (message, options) => showToast({ message, type: "default", ...options }),
+      neutral: (message, options) => showToast({ message, type: "neutral", ...options }),
+      custom: (message, options) => showToast({ message, type: "custom", ...options }),
     });
   }, [showToast]);
 };

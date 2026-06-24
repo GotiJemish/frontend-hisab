@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, RefreshCw, Trash2, Edit, Package, Eye } from "lucide-react";
+import { Plus, Search, RefreshCw, Trash2, Edit, Package, Eye, Shield } from "lucide-react";
 import { Btn, Card, InputField, Table, Modal } from "@/components/ui";
 import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
@@ -21,7 +21,7 @@ export default function ItemsPage() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [viewingItem, setViewingItem] = useState(null);
   const toast = useToast();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -194,24 +194,45 @@ export default function ItemsPage() {
           >
             <Eye className="h-4 w-4" />
           </button>
-          <button
-            onClick={() => handleOpenModal(row)}
-            className="rounded-lg p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-colors"
-            title="Edit Item"
-          >
-            <Edit className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => handleDelete(row.id)}
-            className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors"
-            title="Delete Item"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {hasPermission("items", "update") && (
+            <button
+              onClick={() => handleOpenModal(row)}
+              className="rounded-lg p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-colors"
+              title="Edit Item"
+            >
+              <Edit className="h-4 w-4" />
+            </button>
+          )}
+          {hasPermission("items", "delete") && (
+            <button
+              onClick={() => handleDelete(row.id)}
+              className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/40 transition-colors"
+              title="Delete Item"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       )
     }
   ];
+
+  if (user && !hasPermission("items", "read")) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-8 bg-white dark:bg-[#0F172A] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm max-w-md mx-auto mt-12">
+        <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-full text-red-500 dark:text-red-400 mb-4 ring-8 ring-red-50/50 dark:ring-red-950/10">
+          <Shield className="h-10 w-10" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-6">
+          You do not have the required permissions to view or manage organization items. Please contact your administrator if you believe this is an error.
+        </p>
+        <Btn variant="primary" onClick={() => window.location.href = `/${user?.user_id || ""}`}>
+          Back to Dashboard
+        </Btn>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -221,9 +242,11 @@ export default function ItemsPage() {
           <p className="text-sm text-gray-500">Manage products, services, and charges for your organization.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => handleOpenModal()}>
-            Add Item
-          </Btn>
+          {hasPermission("items", "create") && (
+            <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={() => handleOpenModal()}>
+              Add Item
+            </Btn>
+          )}
         </div>
       </div>
 

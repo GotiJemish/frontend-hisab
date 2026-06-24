@@ -233,11 +233,79 @@ export const customTheme = createTheme({
   },
   toast: {
     root: {
-      base: "flex items-start w-full max-w-xs  p-px-3 py-2 rounded-2xl shadow-xl bg-white border border-gray-100 dark:bg-[#1E293B] dark:border-[#334155]/40 transition-all duration-300",
+      base: "flex backdrop-blur-md items-start w-full max-w-[400px] p-4 rounded-2xl shadow-xl transition-all duration-300 border",
     },
     toggle: {
       base: "flex-shrink-0 -mx-1.5 -my-1.5 p-1.5 rounded-xl outline-none text-gray-400 hover:text-gray-700 hover:bg-gray-50 dark:text-gray-500 dark:hover:text-white dark:hover:bg-slate-800/80 transition-colors focus:ring-2 focus:ring-blue-500/20",
       icon: "h-4 w-4",
     },
+    variants: {
+      success: {
+        container: "bg-emerald-50/50 border-emerald-200/80 dark:bg-emerald-950/20 dark:border-emerald-500/30",
+        iconBg: "bg-emerald-600 text-white dark:bg-emerald-600 dark:text-white",
+        title: "text-gray-900 dark:text-white",
+        message: "text-gray-500 dark:text-gray-455",
+      },
+      error: {
+        container: "bg-rose-50/50 border-rose-200/80 dark:bg-rose-950/20 dark:border-rose-500/30",
+        iconBg: "bg-rose-600 text-white dark:bg-rose-600 dark:text-white",
+        title: "text-gray-900 dark:text-white",
+        message: "text-gray-500 dark:text-gray-455",
+      },
+      danger: {
+        container: "bg-rose-50/50 border-rose-200/80 dark:bg-rose-950/20 dark:border-rose-500/30",
+        iconBg: "bg-rose-600 text-white dark:bg-rose-600 dark:text-white",
+        title: "text-gray-900 dark:text-white",
+        message: "text-gray-500 dark:text-gray-455",
+      },
+      warning: {
+        container: "bg-amber-50/50 border-amber-200/80 dark:bg-amber-950/20 dark:border-amber-500/30",
+        iconBg: "bg-transparent text-amber-500 dark:text-amber-500",
+        title: "text-gray-900 dark:text-white",
+        message: "text-gray-500 dark:text-gray-455",
+      },
+      info: {
+        container: "bg-blue-50/50 border-blue-200/80 dark:bg-blue-950/20 dark:border-blue-500/30",
+        iconBg: "bg-blue-600 text-white dark:bg-blue-600 dark:text-white",
+        title: "text-gray-900 dark:text-white",
+        message: "text-gray-500 dark:text-gray-455",
+      },
+      loading: {
+        container: "bg-purple-50/50 border-purple-200/80 dark:bg-purple-950/20 dark:border-purple-500/30",
+        iconBg: "bg-transparent text-purple-600 dark:text-purple-400",
+        title: "text-gray-900 dark:text-white",
+        message: "text-gray-500 dark:text-gray-455",
+      },
+      promise: {
+        container: "bg-teal-50/50 border-teal-200/80 dark:bg-teal-950/20 dark:border-teal-500/30",
+        iconBg: "bg-teal-600 text-white dark:bg-teal-600 dark:text-white",
+        title: "text-gray-900 dark:text-white",
+        message: "text-gray-500 dark:text-gray-455",
+      },
+      pending: {
+        container: "bg-teal-50/50 border-teal-200/80 dark:bg-teal-950/20 dark:border-teal-500/30",
+        iconBg: "bg-teal-600 text-white dark:bg-teal-600 dark:text-white",
+        title: "text-gray-900 dark:text-white",
+        message: "text-gray-500 dark:text-gray-455",
+      },
+      default: {
+        container: "bg-slate-50/50 border-slate-200/80 dark:bg-slate-900/40 dark:border-slate-700/50",
+        iconBg: "bg-slate-600 text-white dark:bg-slate-600 dark:text-white",
+        title: "text-gray-900 dark:text-white",
+        message: "text-gray-500 dark:text-gray-455",
+      },
+      neutral: {
+        container: "bg-slate-50/50 border-slate-200/80 dark:bg-slate-900/40 dark:border-slate-700/50",
+        iconBg: "bg-slate-600 text-white dark:bg-slate-600 dark:text-white",
+        title: "text-gray-900 dark:text-white",
+        message: "text-gray-500 dark:text-gray-455",
+      },
+      custom: {
+        container: "bg-pink-50/50 border-pink-200/80 dark:bg-pink-950/20 dark:border-pink-500/30",
+        iconBg: "bg-pink-600 text-white dark:bg-pink-600 dark:text-white",
+        title: "text-gray-900 dark:text-white",
+        message: "text-gray-500 dark:text-gray-455",
+      },
+    }
   },
 });
