@@ -23,20 +23,22 @@ export default function Sidebar({ collapsed, mobileOpen, closeMobile }) {
   const { logout, user } = useAuth();
   const userId = params?.userId || "";
   
-  const isAdmin = user?.role === "COMPANY_ADMIN" || user?.role === "SUPER_ADMIN";
+  const isSuper = user?.role === "SUPER_ADMIN";
+  const isCompanyAdmin = user?.role === "COMPANY_ADMIN";
   const perms = user?.permissions || {};
 
   const NAV_ITEMS = [
     { href: `/${userId}`,                 label: "Dashboard",  icon: LayoutDashboard, show: true },
-    { href: `/${userId}/users`,           label: "Users",           icon: Users, show: isAdmin || perms.users?.read || perms.users === true },
-    { href: `/${userId}/roles`,           label: "Roles",           icon: Shield, show: isAdmin || perms.roles?.read || perms.roles === true },
-    { href: `/${userId}/configurations`,  label: "Configurations",  icon: Settings, show: isAdmin },
-    { href: `/${userId}/items`,           label: "Products",        icon: ShoppingBag, show: isAdmin || perms.items === true || perms.items?.read },
-    { href: `/${userId}/invoices`,        label: "Invoices",        icon: Inbox, show: isAdmin || perms.invoices === true || perms.invoices?.read },
-    { href: `/${userId}/challans`,        label: "Challans",        icon: Receipt, show: isAdmin || perms.invoices === true || perms.invoices?.read },
-    { href: `/${userId}/contacts`,        label: "Contacts",        icon: Users, show: isAdmin || perms.contacts === true || perms.contacts?.read },
-    { href: `/${userId}/accounts`,        label: "Accounts",        icon: Wallet, show: isAdmin || perms.accounts === true || perms.accounts?.read },
-    { href: `/${userId}/reports`,  label: "Reports",    icon: FileText, show: isAdmin },
+    { href: `/${userId}/users`,           label: "Users",           icon: Users, show: (!isSuper && isCompanyAdmin) || perms.users?.read || perms.users === true },
+    { href: `/${userId}/roles`,           label: "Roles",           icon: Shield, show: (!isSuper && isCompanyAdmin) || perms.roles?.read || perms.roles === true },
+    { href: `/${userId}/configurations`,  label: "Configurations",  icon: Settings, show: (!isSuper && isCompanyAdmin) },
+    { href: `/${userId}/items`,           label: "Products",        icon: ShoppingBag, show: (!isSuper && isCompanyAdmin) || perms.items === true || perms.items?.read },
+    { href: `/${userId}/invoices`,        label: "Invoices",        icon: Inbox, show: (!isSuper && isCompanyAdmin) || perms.invoices === true || perms.invoices?.read },
+    { href: `/${userId}/challans`,        label: "Challans",        icon: Receipt, show: (!isSuper && isCompanyAdmin) || perms.invoices === true || perms.invoices?.read },
+    { href: `/${userId}/contacts`,        label: "Contacts",        icon: Users, show: (!isSuper && isCompanyAdmin) || perms.contacts === true || perms.contacts?.read },
+    { href: `/${userId}/accounts`,        label: "Accounts",        icon: Wallet, show: (!isSuper && isCompanyAdmin) || perms.accounts === true || perms.accounts?.read },
+    { href: `/${userId}/reports`,  label: "Reports",    icon: FileText, show: (!isSuper && isCompanyAdmin) },
+    { href: `/${userId}/organizations`,  label: "Organizations",    icon: Shield, show: isSuper },
   ];
 
   const BOTTOM_ITEMS = [

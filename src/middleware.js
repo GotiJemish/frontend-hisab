@@ -43,7 +43,8 @@ export function middleware(request) {
       const payload = JSON.parse(Buffer.from(authToken.split(".")[1], "base64").toString());
       const role = payload.role;
       const perms = payload.permissions || {};
-      const isAdmin = role === "COMPANY_ADMIN" || role === "SUPER_ADMIN";
+      const isSuper = role === "SUPER_ADMIN";
+      const isCompanyAdmin = role === "COMPANY_ADMIN";
       
       const pathParts = pathname.split("/");
       // Path format: /<userId>/<module>
@@ -51,16 +52,18 @@ export function middleware(request) {
         const module = pathParts[2];
         let hasAccess = true;
         
-        if (["users", "roles", "configurations", "reports"].includes(module)) {
-          hasAccess = isAdmin;
+        if (module === "organizations") {
+          hasAccess = isSuper;
+        } else if (["users", "roles", "configurations", "reports"].includes(module)) {
+          hasAccess = !isSuper && isCompanyAdmin;
         } else if (module === "items") {
-          hasAccess = isAdmin || perms.items === true || perms.items?.read;
+          hasAccess = (!isSuper && isCompanyAdmin) || perms.items === true || perms.items?.read;
         } else if (module === "orders" || module === "invoices") {
-          hasAccess = isAdmin || perms.invoices === true || perms.invoices?.read;
+          hasAccess = (!isSuper && isCompanyAdmin) || perms.invoices === true || perms.invoices?.read;
         } else if (module === "contacts") {
-          hasAccess = isAdmin || perms.contacts === true || perms.contacts?.read;
+          hasAccess = (!isSuper && isCompanyAdmin) || perms.contacts === true || perms.contacts?.read;
         } else if (module === "accounts") {
-          hasAccess = isAdmin || perms.accounts === true || perms.accounts?.read;
+          hasAccess = (!isSuper && isCompanyAdmin) || perms.accounts === true || perms.accounts?.read;
         }
         
         if (!hasAccess) {

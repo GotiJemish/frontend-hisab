@@ -1,31 +1,43 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Download, RefreshCw, Search, Eye, Users, FileText, Banknote, Building } from "lucide-react";
-import { Btn, Card, Alert, InputField, Table } from "@/components/ui";
+import { Plus, Download, RefreshCw, Search, Eye, Users, FileText, Banknote, Building, CheckCircle, Shield } from "lucide-react";
+import { Btn, Card, Alert, InputField, Table, Modal } from "@/components/ui";
 import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
 import { useLoading } from "@/context/LoadingContext";
 import { useRouter, useParams } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [invoices, setInvoices] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const { loading, setLoading } = useLoading();
   const [search, setSearch] = useState("");
   const toast = useToast();
   const router = useRouter();
   const params = useParams();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [selectedOrg, setSelectedOrg] = useState(null);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [invRes, conRes] = await Promise.all([
-        apiClient.get("/invoices/"),
-        apiClient.get("/contacts/")
-      ]);
-      if (invRes.data.success) setInvoices(invRes.data.data || []);
-      if (conRes.data.success) setContacts(conRes.data.data || []);
+      if (user?.role === "SUPER_ADMIN") {
+        const { data } = await apiClient.get("/admin/companies/");
+        if (data.success) {
+          setCompanies(data.data || []);
+        }
+      } else {
+        const [invRes, conRes] = await Promise.all([
+          apiClient.get("/invoices/"),
+          apiClient.get("/contacts/")
+        ]);
+        if (invRes.data.success) setInvoices(invRes.data.data || []);
+        if (conRes.data.success) setContacts(conRes.data.data || []);
+      }
     } catch (err) {
       toast.error("Failed to load dashboard data");
     } finally {
@@ -34,10 +46,29 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
-  // Compute Stats
+  const handleApprove = async (id, name) => {
+    try {
+      setLoading(true);
+      const { data } = await apiClient.patch(`/admin/companies/${id}/`, {
+        is_approved: true
+      });
+      if (data.success) {
+        toast.success(`Organization "${name}" approved successfully!`);
+        setCompanies(prev => prev.map(o => o.id === id ? { ...o, is_approved: true } : o));
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to approve organization");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Compute Stats for Standard User
   const totalRevenue = invoices.reduce((acc, inv) => acc + parseFloat(inv.total_amount || 0), 0);
   const totalContacts = contacts.length;
   const customers = contacts.filter(c => c.payment_type === "receivable").length;
@@ -48,7 +79,16 @@ export default function DashboardPage() {
     return invDate.getMonth() === now.getMonth() && invDate.getFullYear() === now.getFullYear();
   }).length;
 
-  const STAT_CARDS = [
+  // Compute Stats for Super Admin
+  const totalOrgs = companies.length;
+  const pendingOrgs = companies.filter(c => !c.is_approved).length;
+  const approvedOrgs = companies.filter(c => c.is_approved).length;
+
+  const STAT_CARDS = user?.role === "SUPER_ADMIN" ? [
+    { label: "Total Organizations", value: totalOrgs, icon: <Building className="h-6 w-6 text-blue-500" />, positive: true },
+    { label: "Pending Approval", value: pendingOrgs, icon: <FileText className="h-6 w-6 text-amber-500" />, positive: true },
+    { label: "Approved Organizations", value: approvedOrgs, icon: <CheckCircle className="h-6 w-6 text-green-500" />, positive: true },
+  ] : [
     { label: "Total Revenue", value: `₹${totalRevenue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, icon: <Banknote className="h-6 w-6 text-green-500" />, positive: true },
     { label: "Total Contacts", value: totalContacts, icon: <Users className="h-6 w-6 text-blue-500" />, positive: true },
     { label: "Customers", value: customers, icon: <Building className="h-6 w-6 text-indigo-500" />, positive: true },
@@ -103,6 +143,41 @@ export default function DashboardPage() {
     },
   ];
 
+  // For Super Admin Pending list
+  const pendingList = companies.filter(c => !c.is_approved && ((c.name || "").toLowerCase().includes(search.toLowerCase()) || (c.email || "").toLowerCase().includes(search.toLowerCase())));
+
+  const PENDING_COLUMNS = [
+    {
+      key: "name",
+      header: "Organization Name",
+      render: (val, row) => (
+        <div className="flex flex-col">
+          <span className="font-semibold text-gray-900 dark:text-gray-100">{val || "Unnamed Company"}</span>
+          <span className="text-xs text-gray-500">{row.email || "No email"}</span>
+        </div>
+      )
+    },
+    { key: "phone", header: "Phone", render: (val) => val || "-" },
+    {
+      key: "__actions",
+      header: "Actions",
+      align: "center",
+      render: (_, row) => (
+        <Btn 
+          variant="primary" 
+          size="sm" 
+          className="bg-green-600! hover:bg-green-700!"
+          onClick={() => {
+            setSelectedOrg({ id: row.id, name: row.name });
+            setConfirmOpen(true);
+          }}
+        >
+          Approve
+        </Btn>
+      )
+    }
+  ];
+
   // Calculate Basic Chart Data (Revenue by Contact - Top 5)
   const revenueByContact = invoices.reduce((acc, inv) => {
     const name = getContactName(inv.contact);
@@ -123,26 +198,28 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-[#0F172A] dark:text-[#E2E8F0]">
-            Dashboard overview
+            {user?.role === "SUPER_ADMIN" ? "SaaS Admin Dashboard" : "Dashboard overview"}
           </h1>
           <p className="text-sm text-[#94A3B8] dark:text-[#6B7280] mt-0.5">
-            Instant view of billing and contact details
+            {user?.role === "SUPER_ADMIN" ? "Manage and monitor registered organizations and approvals" : "Instant view of billing and contact details"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Btn
-            variant="primary"
-            size="sm"
-            leftIcon={<Plus className="h-4 w-4" />}
-            onClick={() => router.push(`/${params.userId}/invoices`)}
-          >
-            New Invoice
-          </Btn>
-        </div>
+        {user?.role !== "SUPER_ADMIN" && (
+          <div className="flex items-center gap-2">
+            <Btn
+              variant="primary"
+              size="sm"
+              leftIcon={<Plus className="h-4 w-4" />}
+              onClick={() => router.push(`/${params.userId}/invoices`)}
+            >
+              New Invoice
+            </Btn>
+          </div>
+        )}
       </div>
 
       {/* ── Stat cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {STAT_CARDS.map((card) => (
           <Card key={card.label} hover>
             <div className="flex justify-between items-start">
@@ -162,47 +239,19 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* ── CSS Basic Chart ── */}
-        <Card header={<h2 className="font-semibold text-gray-900 dark:text-white">Top Customers by Revenue</h2>} className="lg:col-span-1">
-          <div className="space-y-4 pt-2">
-            {chartData.length > 0 ? (
-              chartData.map((data, idx) => (
-                <div key={idx} className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium text-gray-700 dark:text-gray-300 truncate w-32">{data.name}</span>
-                    <span className="text-gray-900 dark:text-gray-100 font-semibold">₹{data.amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
-                  </div>
-                  <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5">
-                    <div 
-                      className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full" 
-                      style={{ width: `${(data.amount / maxAmount) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="flex flex-col items-center justify-center h-40 text-gray-400">
-                <FileText className="h-8 w-8 mb-2 opacity-50" />
-                <p className="text-sm">No data to display</p>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {/* ── Invoice table ── */}
-        <div className="lg:col-span-2">
+      {user?.role === "SUPER_ADMIN" ? (
+        <div className="grid grid-cols-1 gap-6">
           <Card
             header={
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h2 className="font-semibold text-[#0F172A] dark:text-[#E2E8F0]">
-                  Recent Invoices
+                  Pending Approvals
                 </h2>
                 <div className="flex items-center gap-2">
                   <InputField
-                    id="invoice-search"
+                    id="pending-org-search"
                     type="search"
-                    placeholder="Search recent..."
+                    placeholder="Search pending..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     leftIcon={<Search className="h-4 w-4" />}
@@ -223,22 +272,120 @@ export default function DashboardPage() {
           >
             <div className="-mx-5 -mb-5">
               <Table
-                columns={TABLE_COLUMNS}
-                data={filtered}
+                columns={PENDING_COLUMNS}
+                data={pendingList}
                 striped
                 hoverable
                 loading={loading}
-                emptyMessage="No recent invoices."
+                emptyMessage="No pending organization approvals."
               />
             </div>
             <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex justify-center bg-gray-50 dark:bg-gray-800/50 -mx-5 -mb-5 mt-5">
-               <button onClick={() => router.push(`/${params.userId}/invoices`)} className="text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-                  View All Invoices &rarr;
+               <button onClick={() => router.push(`/${params.userId}/organizations`)} className="text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                  Manage All Organizations &rarr;
                </button>
             </div>
           </Card>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* ── CSS Basic Chart ── */}
+          <Card header={<h2 className="font-semibold text-gray-900 dark:text-white">Top Customers by Revenue</h2>} className="lg:col-span-1">
+            <div className="space-y-4 pt-2">
+              {chartData.length > 0 ? (
+                chartData.map((data, idx) => (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-gray-700 dark:text-gray-300 truncate w-32">{data.name}</span>
+                      <span className="text-gray-900 dark:text-gray-100 font-semibold">₹{data.amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5">
+                      <div 
+                        className="bg-blue-600 dark:bg-blue-500 h-2.5 rounded-full" 
+                        style={{ width: `${(data.amount / maxAmount) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+                  <FileText className="h-8 w-8 mb-2 opacity-50" />
+                  <p className="text-sm">No data to display</p>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          {/* ── Invoice table ── */}
+          <div className="lg:col-span-2">
+            <Card
+              header={
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <h2 className="font-semibold text-[#0F172A] dark:text-[#E2E8F0]">
+                    Recent Invoices
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    <InputField
+                      id="invoice-search"
+                      type="search"
+                      placeholder="Search recent..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      leftIcon={<Search className="h-4 w-4" />}
+                      className="w-full sm:w-48"
+                    />
+                    <Btn
+                      variant="ghost"
+                      size="sm"
+                      leftIcon={<RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />}
+                      onClick={fetchData}
+                      aria-label="Refresh table"
+                    >
+                      Refresh
+                    </Btn>
+                  </div>
+                </div>
+              }
+            >
+              <div className="-mx-5 -mb-5">
+                <Table
+                  columns={TABLE_COLUMNS}
+                  data={filtered}
+                  striped
+                  hoverable
+                  loading={loading}
+                  emptyMessage="No recent invoices."
+                />
+              </div>
+              <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex justify-center bg-gray-50 dark:bg-gray-800/50 -mx-5 -mb-5 mt-5">
+                 <button onClick={() => router.push(`/${params.userId}/invoices`)} className="text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                    View All Invoices &rarr;
+                 </button>
+              </div>
+            </Card>
+          </div>
+        </div>
+      )}
+      {user?.role === "SUPER_ADMIN" && (
+        <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)} title="Approve Organization" size="md">
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Are you sure you want to approve the organization <strong>{selectedOrg?.name}</strong>? Once approved, their users will be able to log in to HISAAB.
+            </p>
+            <div className="flex justify-end gap-3 mt-6">
+              <Btn variant="outline" onClick={() => setConfirmOpen(false)} type="button">Cancel</Btn>
+              <Btn variant="primary" onClick={async () => {
+                if (selectedOrg) {
+                  await handleApprove(selectedOrg.id, selectedOrg.name);
+                  setConfirmOpen(false);
+                }
+              }} disabled={loading}>
+                {loading ? "Approving..." : "Approve Organization"}
+              </Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
