@@ -33,6 +33,21 @@ export function middleware(request) {
 
   // If user is trying to access a protected route while NOT logged in
   if (!isPublicRoute && pathname !== "/" && !authToken) {
+    // If it's an API request or non-GET method, return 401 Unauthorized instead of redirecting
+    // (Redirecting POST/PUT/DELETE requests causes a 307 redirect, resulting in 405 Method Not Allowed)
+    if (request.method !== "GET" || request.headers.get("accept")?.includes("application/json")) {
+      return new NextResponse(
+        JSON.stringify({
+          success: false,
+          error: "Unauthorized",
+          message: "Authentication credentials were not provided or session expired.",
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
     const url = new URL("/login", request.url);
     return NextResponse.redirect(url);
   }
@@ -67,6 +82,19 @@ export function middleware(request) {
         }
         
         if (!hasAccess) {
+          if (request.method !== "GET" || request.headers.get("accept")?.includes("application/json")) {
+            return new NextResponse(
+              JSON.stringify({
+                success: false,
+                error: "Forbidden",
+                message: "You do not have permission to perform this action.",
+              }),
+              {
+                status: 403,
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+          }
           return NextResponse.redirect(new URL(`/${payload.user_id || payload.id}`, request.url));
         }
       }

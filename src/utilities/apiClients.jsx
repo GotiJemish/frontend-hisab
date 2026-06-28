@@ -3,8 +3,10 @@ import axios from "axios";
 
 const TIMEOUT = 1 * 60 * 1000; // 1 minute timeout
 
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,
+  baseURL: apiBaseUrl || "",
   timeout: TIMEOUT,
   withCredentials: true,
   headers: {
@@ -73,7 +75,7 @@ apiClient.interceptors.response.use(
 
       try {
         const res = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/token/refresh/`,
+          `${apiBaseUrl || ""}/api/token/refresh/`,
           { refresh: refreshToken }
         );
 
