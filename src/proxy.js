@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 const authRoutes = ["/login", "/register", "/forgot-password"];
 const publicRoutes = [...authRoutes]; // Add any other public routes like landing page if needed
 
-export function middleware(request) {
+export function proxy(request) {
   const { pathname } = request.nextUrl;
   const authToken = request.cookies.get("auth_token")?.value;
 
