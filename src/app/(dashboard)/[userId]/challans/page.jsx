@@ -804,9 +804,34 @@ export default function ChallansPage() {
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 dark:text-gray-300 mb-1">Bill To (Contact) <span className="text-rose-500">*</span></label>
                     <AppSelect
-                      options={contacts.map(c => ({ value: c.id, label: `${c.name} ${c.mobile ? `(${c.mobile})` : ""}` }))}
+                      options={[
+                        { value: 'ADD_NEW', label: '+ Add New Contact' },
+                        ...contacts.map(c => ({ value: c.id, label: `${c.name} ${c.mobile ? `(${c.mobile})` : ""}` }))
+                      ]}
                       value={contacts.find(c => c.id == formData.contact) ? { value: formData.contact, label: `${contacts.find(c => c.id == formData.contact).name} ${contacts.find(c => c.id == formData.contact).mobile ? `(${contacts.find(c => c.id == formData.contact).mobile})` : ""}` } : null}
-                      onChange={(selected) => setFormData({...formData, contact: selected?.value || ""})}
+                      onChange={(selected) => {
+                        if (selected?.value === 'ADD_NEW') {
+                          setContactFormData({
+                            name: "",
+                            mobile: "",
+                            email: "",
+                            billing_address: "",
+                            billing_city: "",
+                            billing_state: "Gujarat",
+                            billing_pincode: "",
+                            billing_country: "India",
+                            same_as_billing: true,
+                            shipping_address: "",
+                            shipping_city: "",
+                            shipping_state: "Gujarat",
+                            shipping_pincode: "",
+                            shipping_country: "India",
+                          });
+                          setContactModalOpen(true);
+                        } else {
+                          setFormData({...formData, contact: selected?.value || ""})
+                        }
+                      }}
                       onCreateOption={(inputValue) => {
                         setContactFormData({
                           name: inputValue,
@@ -1077,7 +1102,6 @@ export default function ChallansPage() {
                 </div>
               </div>
             </div>
-
           </div>
         </form>
 
