@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, RefreshCw, Trash2, Eye, Printer, Edit, Shield } from "lucide-react";
+import { Plus, Search, RefreshCw, Trash2, Eye, Printer, Edit, Shield, Share2, Mail, Link as LinkIcon } from "lucide-react";
 import { Btn, Card, InputField, Table, Modal } from "@/components/ui";
 import apiClient from "@/utilities/apiClients";
 import { useToast } from "@/context/ToastContext";
@@ -9,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLoading } from "@/context/LoadingContext";
 import AppSelect from "@/components/ui/AppSelect";
 import ItemFormModal from "../items/components/ItemFormModal";
+import { useParams, useSearchParams } from "next/navigation";
 
 export default function ChallansPage() {
   const [invoices, setInvoices] = useState([]);
@@ -19,6 +20,15 @@ export default function ChallansPage() {
   const [viewingInvoice, setViewingInvoice] = useState(null);
   const { user, hasPermission } = useAuth();
   const [editingInvoiceId, setEditingInvoiceId] = useState(null);
+
+  const params = useParams();
+  const userId = params?.userId || "";
+  const searchParams = useSearchParams();
+  const isPdfView = searchParams?.get("pdf") === "true";
+
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [sharingItem, setSharingItem] = useState(null);
+  const canShare = user?.role === "COMPANY_ADMIN" || user?.role === "SUPER_ADMIN";
 
   
   // Lookups
@@ -110,6 +120,20 @@ export default function ChallansPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Deep-linking: auto-open challan view modal if ?id=xxx search param matches
+  useEffect(() => {
+    if (invoices && invoices.length > 0 && typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const challanId = urlParams.get("id");
+      if (challanId) {
+        const found = invoices.find(i => String(i.id) === String(challanId));
+        if (found) {
+          handleViewModal(found);
+        }
+      }
+    }
+  }, [invoices]);
 
   // Sync GST rates with taxes from configuration module
   useEffect(() => {
@@ -672,6 +696,18 @@ export default function ChallansPage() {
           <button onClick={() => handleViewModal(row)} className="p-1.5 text-blue-500 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-all" title="View & Print Details">
             <Eye className="h-4 w-4" />
           </button>
+          {canShare && (
+            <button 
+              onClick={() => {
+                setSharingItem({ type: "challan", details: row });
+                setShareModalOpen(true);
+              }}
+              className="p-1.5 text-emerald-500 hover:bg-emerald-50 dark:hover:bg-slate-800 rounded-lg transition-all"
+              title="Share Challan"
+            >
+              <Share2 className="h-4 w-4" />
+            </button>
+          )}
           {hasPermission("invoices", "update") && (
             <button onClick={() => handleEditModal(row)} className="p-1.5 text-amber-500 hover:bg-amber-50 dark:hover:bg-slate-800 rounded-lg transition-all" title="Edit Challan">
               <Edit className="h-4 w-4" />
@@ -704,6 +740,220 @@ export default function ChallansPage() {
     );
   }
 
+  if (isPdfView) {
+    const activeInvoice = invoices.find(i => String(i.id) === String(searchParams.get("id")));
+    if (loading && invoices.length === 0) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-white dark:bg-[#0B1220]">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+          <span className="ml-3 text-sm text-gray-500">Loading challan document...</span>
+        </div>
+      );
+    }
+    if (!activeInvoice) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen p-8 text-center bg-white dark:bg-slate-900">
+          <p className="text-red-500 font-semibold mb-2">Challan Document Not Found</p>
+          <p className="text-xs text-gray-500">Please verify the link or check if it has been deleted.</p>
+        </div>
+      );
+    }
+
+    const activeGstType = activeInvoice.internal_note?.startsWith("[GST_TYPE:inter]") ? "inter" : "intra";
+
+    return (
+      <div className="bg-white dark:bg-slate-950 min-h-screen p-4 md:p-8 max-w-4xl mx-auto">
+        <style dangerouslySetInnerHTML={{__html: `
+          @media print {
+            .print-hide {
+              display: none !important;
+            }
+          }
+        `}} />
+        <div className="flex justify-end gap-3 mb-6 print-hide">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-blue-500/10 cursor-pointer"
+          >
+            <Printer className="h-4 w-4" />
+            Print / Save PDF
+          </button>
+        </div>
+
+        {/* Printable invoice container */}
+        <div id="printable-invoice" className="bg-white text-slate-800 p-8 rounded-2xl border border-slate-200 dark:border-slate-850 dark:bg-slate-900 dark:text-slate-100 shadow-xl space-y-6">
+          {/* TOP HEADER */}
+          <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-800 pb-6">
+            <div>
+              <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-650 dark:text-blue-400 px-3.5 py-1.5 rounded-full text-xs font-black tracking-wider uppercase">
+                Delivery Challan
+              </span>
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white mt-4">{companyProfile?.name || "My Company"}</h2>
+              {companyProfile?.gstin && <p className="text-xs text-slate-500 mt-1 font-semibold">GSTIN: {companyProfile.gstin}</p>}
+              {companyProfile?.pan && <p className="text-xs text-slate-500 mt-0.5 font-semibold">PAN: {companyProfile.pan}</p>}
+              {companyProfile?.address && <p className="text-xs text-slate-400 mt-1 max-w-xs">{companyProfile.address}</p>}
+            </div>
+            <div className="text-right space-y-1 text-sm font-medium">
+              <p className="text-[10px] text-slate-400 uppercase font-black tracking-wider">Challan Details</p>
+              <p className="text-slate-900 dark:text-slate-100 font-extrabold">Bill ID: {activeInvoice.bill_id}</p>
+              <p className="text-slate-600 dark:text-slate-400">Challan #: {activeInvoice.invoice_number || "N/A"}</p>
+              <p className="text-slate-600 dark:text-slate-400">Date: {activeInvoice.invoice_date}</p>
+            </div>
+          </div>
+
+          {/* TWO COLUMN INFO (BILL TO & CHALLAN DETAILS) */}
+          <div id="printable-invoice-info-grid" className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-100 dark:border-slate-800/60">
+            <div>
+              <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Billed To</h3>
+              <p className="font-extrabold text-lg text-slate-900 dark:text-slate-100">{getContactName(activeInvoice.contact)}</p>
+              {(() => {
+                const contactObj = contacts.find(c => c.id == activeInvoice.contact);
+                if (contactObj) {
+                  return (
+                    <div className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 space-y-0.5 font-medium">
+                      {contactObj.mobile && <p>Mobile: {contactObj.mobile}</p>}
+                      {contactObj.billing_address && <p>Address: {contactObj.billing_address}</p>}
+                      {contactObj.billing_state && <p>State: {contactObj.billing_state}</p>}
+                      {contactObj.gst && <p className="font-extrabold text-slate-700 dark:text-slate-350 mt-1">GSTIN: {contactObj.gst}</p>}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+            
+            <div id="printable-invoice-info-grid-right" className="md:border-l md:border-slate-200 dark:md:border-slate-800 md:pl-6 space-y-3">
+              <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Challan Information</h3>
+              <div className="text-sm font-medium">
+                <div>
+                  <p className="text-xs text-slate-450">Party Challan No.</p>
+                  <p className="text-slate-800 dark:text-slate-200 font-bold mt-0.5">{activeInvoice.party_challan_no || "N/A"}</p>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 italic">Delivery Challan numbers are listed per item below.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* ITEMS TABLE */}
+          <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-900/10">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">
+                <tr>
+                  <th className="px-4 py-3 font-bold text-center w-12">Sr.</th>
+                  <th className="px-4 py-3 font-bold">Item Description</th>
+                  <th className="px-4 py-3 font-bold w-28">DC No.</th>
+                  <th className="px-4 py-3 font-bold text-right w-20">Qty</th>
+                  <th className="px-4 py-3 font-bold text-right w-28">Rate</th>
+                  <th className="px-4 py-3 font-bold text-right w-20">GST</th>
+                  <th className="px-4 py-3 font-bold text-right w-24">GST Amt</th>
+                  <th className="px-4 py-3 font-bold text-right w-32">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-slate-850 dark:text-slate-200">
+                {activeInvoice.items?.map((item, idx) => {
+                  const qty = parseFloat(item.quantity) || 0;
+                  const rate = parseFloat(item.rate) || 0;
+                  const gstPerc = parseFloat(item.gst_percentage) || 5;
+                  const taxable = qty * rate;
+                  const gstAmt = parseFloat(item.tax_amount) || (taxable * gstPerc / 100);
+                  const itemTotal = parseFloat(item.total) || (taxable + gstAmt);
+
+                  return (
+                    <tr key={idx} className="bg-white dark:bg-slate-900/10 hover:bg-slate-50/50 dark:hover:bg-slate-850/50">
+                      <td className="px-4 py-3 text-center text-slate-400 font-medium">{idx + 1}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-extrabold text-slate-900 dark:text-white">{item.description || "Product/Service"}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">{item.delivery_challan_no || "-"}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold">{qty}</td>
+                      <td className="px-4 py-3 text-right font-medium">{formatCurrency(rate)}</td>
+                      <td className="px-4 py-3 text-right font-semibold">{gstPerc}%</td>
+                      <td className="px-4 py-3 text-right font-medium text-slate-500 dark:text-slate-400">{formatCurrency(gstAmt)}</td>
+                      <td className="px-4 py-3 text-right font-black text-slate-900 dark:text-white">{formatCurrency(itemTotal)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* CALCULATION SUMMARY PANEL */}
+          <div id="printable-invoice-bottom-flex" className="flex flex-col md:flex-row justify-between items-start pt-4 gap-6">
+            {/* Notes & Terms */}
+            <div className="flex-1 space-y-4 max-w-md w-full">
+              {activeInvoice.notes && (
+                <div className="bg-slate-50 dark:bg-slate-800/20 p-4 rounded-xl border border-slate-100 dark:border-slate-800/60">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-widest">Customer Notes</h4>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-wrap leading-relaxed">{activeInvoice.notes}</p>
+                </div>
+              )}
+              <div className="h-24 border border-dashed border-slate-200 dark:border-slate-850 rounded-2xl flex items-end justify-center p-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/10">
+                Authorized Signatory
+              </div>
+            </div>
+
+            {/* Financial Summary */}
+            <div className="w-full md:w-80 bg-slate-50 dark:bg-slate-850/40 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl space-y-3 shadow-sm text-sm">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2 mb-2">GST Summary</h4>
+              
+              {(() => {
+                const gstSum = activeInvoice.gst_summary || {};
+                const subtotal = parseFloat(gstSum.subtotal) || 0;
+                const totalGst = parseFloat(gstSum.total_gst) || 0;
+                const cgst = parseFloat(gstSum.cgst) || (totalGst / 2);
+                const sgst = parseFloat(gstSum.sgst) || (totalGst / 2);
+                const igst = parseFloat(gstSum.igst) || totalGst;
+                const grandTotal = parseFloat(gstSum.grand_total) || (subtotal + totalGst);
+
+                return (
+                  <div className="space-y-2.5 font-medium">
+                    <div className="flex justify-between items-center text-slate-600 dark:text-slate-400">
+                      <span>Subtotal (Before Tax)</span>
+                      <span className="text-slate-900 dark:text-white font-extrabold">{formatCurrency(subtotal)}</span>
+                    </div>
+
+                    {activeGstType === "intra" ? (
+                      <>
+                        <div className="flex justify-between items-center text-slate-500 pl-3 border-l border-slate-200 dark:border-slate-700">
+                          <span>CGST (2.5% / 5% / etc)</span>
+                          <span>{formatCurrency(cgst)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-500 pl-3 border-l border-slate-200 dark:border-slate-700">
+                          <span>SGST (2.5% / 5% / etc)</span>
+                          <span>{formatCurrency(sgst)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex justify-between items-center text-slate-500 pl-3 border-l border-slate-200 dark:border-slate-700">
+                        <span>IGST (5% / 12% / etc)</span>
+                        <span>{formatCurrency(igst)}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center text-slate-600 dark:text-slate-400 pt-1.5 border-t border-slate-200 dark:border-slate-800">
+                      <span>Total GST Amount</span>
+                      <span className="text-slate-900 dark:text-white font-bold">{formatCurrency(totalGst)}</span>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-300 dark:border-slate-700 mt-1">
+                      <div className="flex justify-between items-center bg-emerald-50 dark:bg-emerald-950/20 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-900/30 text-base font-black">
+                        <span className="text-slate-800 dark:text-emerald-300">Grand Total</span>
+                        <span className="text-emerald-600 dark:text-emerald-400">{formatCurrency(grandTotal)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Simple Printing Style Sheet to support Ctrl+P fallback */}
@@ -720,11 +970,27 @@ export default function ChallansPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Challans</h1>
           <p className="text-sm text-gray-500">Manage and preview Delivery Challans</p>
         </div>
-        {hasPermission("invoices", "create") && (
-          <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={handleOpenModal}>
-            Create Challan
-          </Btn>
-        )}
+        <div className="flex items-center gap-2 print-hide">
+          {canShare && (
+            <Btn 
+              variant="outline" 
+              size="sm" 
+              leftIcon={<Share2 className="h-4 w-4" />} 
+              onClick={() => {
+                setSharingItem({ type: "list", details: null });
+                setShareModalOpen(true);
+              }}
+              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800/40 dark:text-emerald-400 dark:hover:bg-emerald-950/20"
+            >
+              Share List
+            </Btn>
+          )}
+          {hasPermission("invoices", "create") && (
+            <Btn variant="primary" size="sm" leftIcon={<Plus className="h-4 w-4" />} onClick={handleOpenModal}>
+              Create Challan
+            </Btn>
+          )}
+        </div>
       </div>
 
       <Card
@@ -1393,6 +1659,124 @@ export default function ChallansPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Share Modal */}
+      {canShare && (
+        <Modal 
+          open={shareModalOpen} 
+          onClose={() => {
+            setShareModalOpen(false);
+            setSharingItem(null);
+          }} 
+          title={sharingItem?.type === "list" ? "Share Challan List" : "Share Challan"} 
+          size="md"
+        >
+          <div className="space-y-6 pt-2 pb-4">
+            <p className="text-sm text-gray-500">
+              {sharingItem?.type === "list" 
+                ? "Share the link to the full list of challans via one of the channels below." 
+                : `Share details for Challan ID: ${sharingItem?.details?.bill_id}.`
+              }
+            </p>
+            
+            <div className="grid grid-cols-1 gap-3">
+              {/* WhatsApp Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window === "undefined" || !sharingItem) return;
+                  const path = sharingItem.type === "list" 
+                    ? `/${userId}/challans` 
+                    : `/share/challan/${sharingItem.details.bill_id}`;
+                  const fullUrl = window.location.origin + path;
+                  const text = sharingItem.type === "list" 
+                    ? `Hello, please check the Challan list here: ${fullUrl}` 
+                    : `Hello, please find the details of Challan ${sharingItem.details.bill_id} here: ${fullUrl}`;
+                  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+                }}
+                className="w-full flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:border-green-500 hover:bg-green-50/20 dark:border-gray-800 dark:hover:border-green-800 dark:hover:bg-green-950/10 transition-all text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 group-hover:scale-105 transition-transform">
+                    <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
+                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.514 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.713-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.416 9.863-9.848.002-2.63-1.023-5.101-2.884-6.963C16.59 1.83 14.116.804 11.488.804 6.056.804 1.63 5.22 1.627 10.652c-.001 1.7.447 3.36 1.299 4.83l-.997 3.646 3.734-.974zm12.39-7.234c-.305-.153-1.808-.891-2.087-.993-.28-.103-.483-.153-.686.153-.203.305-.788.993-.966 1.2-.178.203-.356.228-.661.076-.305-.153-1.288-.475-2.454-1.517-.908-.81-1.52-1.81-1.698-2.115-.178-.305-.019-.47.133-.621.137-.136.305-.356.457-.534.153-.178.203-.305.305-.509.102-.203.05-.381-.025-.534-.076-.153-.686-1.653-.94-2.263-.247-.595-.5-.515-.686-.525-.178-.009-.381-.01-.585-.01-.203 0-.534.076-.814.381-.28.305-1.068 1.042-1.068 2.542 0 1.5 1.093 2.947 1.246 3.15.153.203 2.15 3.284 5.207 4.603.727.314 1.294.5 1.737.641.73.232 1.393.2 1.918.12.585-.087 1.808-.737 2.062-1.448.254-.712.254-1.322.178-1.448-.076-.126-.28-.203-.585-.356z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 dark:text-white text-sm">WhatsApp</h4>
+                    <p className="text-xs text-gray-500">Send via WhatsApp Web or mobile app</p>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">&rarr;</span>
+              </button>
+
+              {/* Email Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window === "undefined" || !sharingItem) return;
+                  const path = sharingItem.type === "list" 
+                    ? `/${userId}/challans` 
+                    : `/share/challan/${sharingItem.details.bill_id}`;
+                  const fullUrl = window.location.origin + path;
+                  const subject = sharingItem.type === "list" 
+                    ? `Challan List` 
+                    : `Challan ${sharingItem.details.bill_id} Details`;
+                  const body = sharingItem.type === "list" 
+                    ? `Please check the Challan list at: ${fullUrl}` 
+                    : `Please check the details of Challan ${sharingItem.details.bill_id} here: ${fullUrl}`;
+                  window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_self");
+                }}
+                className="w-full flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:border-blue-500 hover:bg-blue-50/20 dark:border-gray-800 dark:hover:border-blue-800 dark:hover:bg-blue-950/10 transition-all text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform">
+                    <Mail className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 dark:text-white text-sm">Email</h4>
+                    <p className="text-xs text-gray-500">Send email via your local mail client</p>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">&rarr;</span>
+              </button>
+
+              {/* Copy Link Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window === "undefined" || !sharingItem) return;
+                  const path = sharingItem.type === "list" 
+                    ? `/${userId}/challans` 
+                    : `/share/challan/${sharingItem.details.bill_id}`;
+                  const fullUrl = window.location.origin + path;
+                  navigator.clipboard.writeText(fullUrl);
+                  toast.success("Link copied to clipboard!");
+                  setShareModalOpen(false);
+                }}
+                className="w-full flex items-center justify-between p-4 rounded-xl border border-gray-200 hover:border-purple-500 hover:bg-purple-50/20 dark:border-gray-800 dark:hover:border-purple-800 dark:hover:bg-purple-950/10 transition-all text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:purple-400 group-hover:scale-105 transition-transform">
+                    <LinkIcon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 dark:text-white text-sm">Copy Link</h4>
+                    <p className="text-xs text-gray-500">Copy URL path to clipboard</p>
+                  </div>
+                </div>
+                <span className="text-xs font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400">&rarr;</span>
+              </button>
+            </div>
+            
+            <div className="flex justify-end pt-4 border-t border-slate-100 dark:border-slate-800">
+              <Btn variant="outline" size="sm" type="button" onClick={() => setShareModalOpen(false)}>
+                Close
+              </Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

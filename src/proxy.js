@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const authRoutes = ["/login", "/register", "/forgot-password"];
-const publicRoutes = [...authRoutes]; // Add any other public routes like landing page if needed
+const publicRoutes = [...authRoutes, "/share/invoice", "/share/challan"]; // Add any other public routes like landing page if needed
 
 export function proxy(request) {
   const { pathname } = request.nextUrl;

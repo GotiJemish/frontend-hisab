@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
+import { useSearchParams } from "next/navigation";
 
 /**
  * MainLayout – application shell wrapper
@@ -15,6 +16,16 @@ import Sidebar from "./Sidebar";
 export default function MainLayout({ children }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const searchParams = useSearchParams();
+  const isPdf = searchParams?.get("pdf") === "true";
+
+  if (isPdf) {
+    return (
+      <main className="flex-1 min-h-screen bg-white dark:bg-[#0B1220] p-4 md:p-6 overflow-y-auto">
+        {children}
+      </main>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-[#F8FAFC] dark:bg-[#0B1220]">
